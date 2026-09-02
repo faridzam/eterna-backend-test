@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  CANCELLED
+}
+
+model User {
+  id           String    @id @default(uuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  sessions     Session[]
+  products     Product[]
+  invoices     Invoice[]
+}
+
+model Session {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+  userAgent String?
+  ipAddress String?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Product {
+  id             String        @id @default(uuid())
+  userId         String
+  sku            String
+  name           String
+  description    String?
+  unitPriceCents Int
+  quantityOnHand Int
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoiceItems   InvoiceItem[]
+
+  @@unique([userId, sku])
+  @@index([userId, name])
+}
+
+model Invoice {
+  id              String        @id @default(uuid())
+  userId          String
+  invoiceNumber   String        @unique
+  customerName    String
+  issueDate       DateTime
+  dueDate         DateTime?
+  status          InvoiceStatus @default(DRAFT)
+  notes           String?
+  subtotalCents   Int
+  taxAmountCents  Int
+  totalCents      Int
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items           InvoiceItem[]
+
+  @@index([userId, status, createdAt])
+}
+
+model InvoiceItem {
+  id             String   @id @default(uuid())
+  invoiceId      String
+  productId      String
+  productName    String
+  unitPriceCents Int
+  quantity       Int
+  lineTotalCents Int
+  invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([invoiceId])
+  @@index([productId])
+}

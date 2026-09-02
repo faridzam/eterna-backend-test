@@ -1,6 +1,54 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# StockFlow API
+
+NestJS, PostgreSQL, Prisma, and opaque HttpOnly browser sessions for StockFlow.
+
+## Setup
+
+1. Install Node.js 24+ and PostgreSQL 16+ (or use Docker Compose).
+2. Run `npm install`, then copy `.env.example` to `.env` and set a strong `SESSION_TOKEN_PEPPER`.
+3. Create the database configured by `DATABASE_URL`.
+4. Run `npm run prisma:generate && npx prisma migrate deploy && npm run db:seed`.
+5. Start the API with `npm run start:dev` at `http://localhost:8000`; Swagger is at `http://localhost:8000/api-docs`.
+
+For Docker, run `docker compose up --build`; Compose applies migrations before starting the API. Seed with `docker compose run --rm migrate npm run db:seed`.
+
+Demo account: `demo@stockflow.local` / `stockflow-demo-password`.
+
+## Environment
+
+See `.env.example`. `DATABASE_URL`, `FRONTEND_ORIGIN`, `CORS_ORIGINS`, `SESSION_DURATION_HOURS`, `SESSION_TOKEN_PEPPER`, and `TAX_RATE_BASIS_POINTS` are required operational settings. Production requires a 32-character-or-longer token pepper and sets the session cookie `Secure`; development defaults to `http://localhost:8000` and a non-Secure cookie for local HTTP.
+
+## API
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| POST | `/auth/register` | Register a user |
+| POST | `/auth/login` | Set opaque session cookie |
+| GET | `/auth/me` | Read authenticated user |
+| POST | `/auth/logout` | Revoke session and clear cookie |
+| GET/POST | `/products` | List/create owned products |
+| GET/PATCH/DELETE | `/products/:id` | Read/update/delete an owned product |
+| GET/POST | `/invoices` | List/create owned invoices |
+| GET | `/invoices/:id` | Read an owned invoice |
+| PATCH | `/invoices/:id/status` | Issue, pay, or cancel an invoice |
+
+All protected routes use the `stockflow_session` HttpOnly, `SameSite=Lax` cookie. State-changing operations require an allowed `Origin` or `Referer`, and CORS permits only explicit configured origins with credentials. Passwords use Argon2id. Session rows contain an HMAC-SHA-256 hash of a cryptographically random token, never the raw cookie value. Product and invoice repositories scope every record operation by the authenticated user ID. Invoice totals use integer cents; issuing/cancelling stock operations run in serializable transactions. Products referenced by invoice items cannot be deleted.
+
+## Validation
+
+Run `npm run prisma:generate`, `npm run build`, `npm run lint`, `npm test`, and `npm run test:e2e`. E2E requires an isolated PostgreSQL database configured through `DATABASE_URL`.
+
+## Decisions
+
+- PostgreSQL/Prisma gives durable relational persistence and database constraints.
+- Argon2id is used for per-password salted hashing.
+- Opaque sessions allow immediate server-side revocation without exposing a bearer token to JavaScript.
+- The invoice number is random-suffixed to avoid a race-prone global counter.
+- Line items are immutable price/name snapshots; draft item editing is intentionally not exposed in this scoped first implementation.
+
+## AI Usage
+
+GitHub Copilot assisted with implementation, tests, and documentation. Estimated implementation time: 8 hours.
 
 [circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
 [circleci-url]: https://circleci.com/gh/nestjs/nest

@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: stockflow
+      POSTGRES_USER: stockflow
+      POSTGRES_PASSWORD: stockflow
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stockflow -d stockflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  migrate:
+    build:
+      context: .
+      target: build
+    command: npx prisma migrate deploy
+    environment:
+      DATABASE_URL: postgresql://stockflow:stockflow@postgres:5432/stockflow?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://stockflow:stockflow@postgres:5432/stockflow?schema=public
+      PORT: 8000
+      NODE_ENV: development
+      FRONTEND_ORIGIN: http://localhost:8000
+      CORS_ORIGINS: http://localhost:8000
+      SESSION_DURATION_HOURS: 168
+      SESSION_TOKEN_PEPPER: development-only-session-pepper-change-me
+      TAX_RATE_BASIS_POINTS: 1100
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "8000:8000"
+
+volumes:
+  postgres-data:
