@@ -1,6 +1,7 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import cookieParser from 'cookie-parser';
 import { json } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module.js';
@@ -11,6 +12,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
   const config = app.get(AppConfigService);
   app.use(json({ limit: '100kb' }));
+  app.use(cookieParser());
   app.use(helmet());
   app.enableCors({
     origin: (origin: string | undefined, callback: (error: Error | null, allowed?: boolean) => void) => {

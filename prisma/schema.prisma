@@ -51,11 +51,12 @@ model Product {
   quantityOnHand Int
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
   user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   invoiceItems   InvoiceItem[]
 
-  @@unique([userId, sku])
   @@index([userId, name])
+  @@index([userId, deletedAt])
 }
 
 model Invoice {

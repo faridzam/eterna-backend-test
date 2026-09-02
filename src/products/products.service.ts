@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { paginationOffset } from '../common/pagination.js';
 import type { ProductRepository } from './domain/product.types.js';
 import { PRODUCT_REPOSITORY } from './domain/product.types.js';
@@ -12,7 +12,7 @@ export class ProductsService {
     try {
       return await this.products.create({
         userId,
-        sku: input.sku.trim(),
+        sku: input.sku.trim().toUpperCase(),
         name: input.name.trim(),
         description: input.description?.trim() || null,
         unitPriceCents: input.unitPriceCents,
@@ -38,12 +38,13 @@ export class ProductsService {
 
   async update(userId: string, id: string, input: UpdateProductDto) {
     const update = {
-      ...(input.sku === undefined ? {} : { sku: input.sku.trim() }),
+      ...(input.sku === undefined ? {} : { sku: input.sku.trim().toUpperCase() }),
       ...(input.name === undefined ? {} : { name: input.name.trim() }),
       ...(input.description === undefined ? {} : { description: input.description.trim() || null }),
       ...(input.unitPriceCents === undefined ? {} : { unitPriceCents: input.unitPriceCents }),
       ...(input.quantityOnHand === undefined ? {} : { quantityOnHand: input.quantityOnHand }),
     };
+    if (Object.keys(update).length === 0) throw new BadRequestException('At least one product field must be provided.');
     try {
       const product = await this.products.update(userId, id, update);
       if (product === null) {

@@ -1,18 +1,23 @@
-import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+
+const trimString = ({ value }: { value: unknown }): unknown => typeof value === 'string' ? value.trim() : value;
 
 export class CreateProductDto {
+  @Transform(trimString)
   @IsString()
-  @MinLength(1)
+  @IsNotEmpty()
   @MaxLength(100)
   declare sku: string;
 
+  @Transform(trimString)
   @IsString()
-  @MinLength(1)
+  @IsNotEmpty()
   @MaxLength(200)
   declare name: string;
 
   @IsOptional()
+  @Transform(trimString)
   @IsString()
   @MaxLength(2000)
   description?: string;
@@ -32,18 +37,21 @@ export class CreateProductDto {
 
 export class UpdateProductDto {
   @IsOptional()
+  @Transform(trimString)
   @IsString()
-  @MinLength(1)
+  @IsNotEmpty()
   @MaxLength(100)
   sku?: string;
 
   @IsOptional()
+  @Transform(trimString)
   @IsString()
-  @MinLength(1)
+  @IsNotEmpty()
   @MaxLength(200)
   name?: string;
 
   @IsOptional()
+  @Transform(trimString)
   @IsString()
   @MaxLength(2000)
   description?: string;

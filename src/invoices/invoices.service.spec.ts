@@ -8,7 +8,7 @@ import { InvoicesService } from './invoices.service.js';
 
 function createHarness() {
   let product: ProductRecord = {
-    id: 'product-1', userId: 'user-1', sku: 'SF-100', name: 'Packing tape', description: null, unitPriceCents: 350, quantityOnHand: 4, createdAt: new Date(), updatedAt: new Date(),
+    id: 'product-1', userId: 'user-1', sku: 'SF-100', name: 'Packing tape', description: null, unitPriceCents: 350, quantityOnHand: 4, createdAt: new Date(), updatedAt: new Date(), deletedAt: null,
   };
   let invoice: InvoiceRecord | null = null;
   const products: ProductRepository = {
