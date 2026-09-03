@@ -3,9 +3,11 @@ import { Prisma, StockMovementReason } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service.js';
 import type {
     CreateProductRecord,
+    ProductOwner,
     ProductPage,
     ProductRecord,
     ProductRepository,
+    ProductScope,
     UpdateProductRecord,
 } from '../domain/product.types.js';
 
@@ -35,13 +37,13 @@ export class PrismaProductRepository implements ProductRepository {
   }
 
   async findMany(
-    userId: string,
+    scope: ProductScope,
     search: string | undefined,
     skip: number,
     take: number,
   ): Promise<ProductPage> {
     const where = {
-      userId,
+      ...(scope.role === 'ADMIN' ? {} : { userId: scope.userId }),
       deletedAt: null,
       ...(search === undefined
         ? {}
@@ -60,10 +62,31 @@ export class PrismaProductRepository implements ProductRepository {
         skip,
         take,
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        select: {
+          id: true,
+          userId: true,
+          sku: true,
+          name: true,
+          description: true,
+          unitPriceCents: true,
+          quantityOnHand: true,
+          createdAt: true,
+          updatedAt: true,
+          deletedAt: true,
+          user: { select: { id: true, name: true, email: true } },
+        },
       }),
       this.prisma.product.count({ where }),
     ]);
-    return { items, total };
+    return {
+      items: items.map((item) => {
+        const { user, ...product } = item;
+        return scope.role === 'ADMIN'
+          ? { ...product, owner: user satisfies ProductOwner }
+          : product;
+      }),
+      total,
+    };
   }
 
   async update(
@@ -96,9 +119,13 @@ export class PrismaProductRepository implements ProductRepository {
     });
   }
 
-  async delete(userId: string, id: string): Promise<boolean> {
+  async delete(scope: ProductScope, id: string): Promise<boolean> {
     const result = await this.prisma.product.updateMany({
-      where: { id, userId, deletedAt: null },
+      where: {
+        id,
+        ...(scope.role === 'ADMIN' ? {} : { userId: scope.userId }),
+        deletedAt: null,
+      },
       data: { deletedAt: new Date() },
     });
     return result.count > 0;

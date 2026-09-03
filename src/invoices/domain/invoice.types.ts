@@ -85,18 +85,12 @@ export interface InvoiceRepository {
     skip: number,
     take: number,
   ): Promise<InvoicePage>;
-  issue(
-    userId: string,
-    id: string,
-  ): Promise<boolean>;
+  issue(userId: string, id: string): Promise<boolean>;
   transition(
     userId: string,
     id: string,
     from: InvoiceStatus,
     to: InvoiceStatus,
   ): Promise<boolean>;
-  cancelIssued(
-    userId: string,
-    id: string,
-  ): Promise<boolean>;
+  cancelIssued(userId: string, id: string): Promise<boolean>;
 }

@@ -1,8 +1,8 @@
 import {
-    CanActivate,
-    ExecutionContext,
-    ForbiddenException,
-    Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { UserRole } from './domain/auth.types.js';
@@ -24,7 +24,9 @@ export class RolesGuard implements CanActivate {
       request.authenticatedUser === undefined ||
       !required.includes(request.authenticatedUser.role)
     ) {
-      throw new ForbiddenException('You are not allowed to perform this action.');
+      throw new ForbiddenException(
+        'You are not allowed to perform this action.',
+      );
     }
     return true;
   }

@@ -9,6 +9,18 @@ export interface ProductRecord {
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly deletedAt: Date | null;
+  readonly owner?: ProductOwner;
+}
+
+export interface ProductOwner {
+  readonly id: string;
+  readonly name: string;
+  readonly email: string;
+}
+
+export interface ProductScope {
+  readonly userId: string;
+  readonly role: 'ADMIN' | 'STAFF';
 }
 
 export interface ProductPage {
@@ -32,7 +44,7 @@ export interface ProductRepository {
   create(input: CreateProductRecord): Promise<ProductRecord>;
   findById(userId: string, id: string): Promise<ProductRecord | null>;
   findMany(
-    userId: string,
+    scope: ProductScope,
     search: string | undefined,
     skip: number,
     take: number,
@@ -42,5 +54,5 @@ export interface ProductRepository {
     id: string,
     input: UpdateProductRecord,
   ): Promise<ProductRecord | null>;
-  delete(userId: string, id: string): Promise<boolean>;
+  delete(scope: ProductScope, id: string): Promise<boolean>;
 }

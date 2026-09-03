@@ -93,9 +93,7 @@ describe('Prisma invoice integration', () => {
       ],
     });
 
-    await expect(
-      repository.issue(user.id, invoice.id),
-    ).resolves.toBe(true);
+    await expect(repository.issue(user.id, invoice.id)).resolves.toBe(true);
     await expect(
       prisma.product.findUnique({ where: { id: first.id } }),
     ).resolves.toMatchObject({ quantityOnHand: 3 });
@@ -200,7 +198,9 @@ describe('Prisma invoice integration', () => {
       repository.issue(user.id, invoice.id),
       repository.issue(user.id, invoice.id),
     ]);
-    expect(results.filter((result) => result.status === 'fulfilled' && result.value)).toHaveLength(1);
+    expect(
+      results.filter((result) => result.status === 'fulfilled' && result.value),
+    ).toHaveLength(1);
     await expect(
       prisma.product.findUnique({ where: { id: product.id } }),
     ).resolves.toMatchObject({ quantityOnHand: 0 });

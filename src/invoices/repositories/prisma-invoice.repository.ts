@@ -1,10 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import {
-  InvoiceStatus,
-  Prisma,
-  PrismaClient,
-  StockMovementReason,
-} from '@prisma/client';
+import { InvoiceStatus, Prisma, StockMovementReason } from '@prisma/client';
+import { PrismaService } from '../../database/prisma.service.js';
 import type {
   CreateInvoiceRecord,
   InvoicePage,
@@ -23,7 +19,7 @@ const invoiceWithItems = Prisma.validator<Prisma.InvoiceInclude>()({
 
 @Injectable()
 export class PrismaInvoiceRepository implements InvoiceRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(input: CreateInvoiceRecord): Promise<InvoiceRecord> {
     return this.prisma.invoice.create({
@@ -109,10 +105,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
     return { items, total };
   }
 
-  async issue(
-    userId: string,
-    id: string,
-  ): Promise<boolean> {
+  async issue(userId: string, id: string): Promise<boolean> {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         return await this.prisma.$transaction(
@@ -182,10 +175,7 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
     return updated.count === 1;
   }
 
-  async cancelIssued(
-    userId: string,
-    id: string,
-  ): Promise<boolean> {
+  async cancelIssued(userId: string, id: string): Promise<boolean> {
     try {
       return await this.prisma.$transaction(
         async (transaction) => {

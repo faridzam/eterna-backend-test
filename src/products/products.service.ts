@@ -1,17 +1,19 @@
 import {
-  BadRequestException,
-  ConflictException,
-  Inject,
-  Injectable,
-  NotFoundException,
+    BadRequestException,
+    ConflictException,
+    ForbiddenException,
+    Inject,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
+import type { AuthenticatedUser } from '../auth/domain/auth.types.js';
 import { paginationOffset } from '../common/pagination.js';
 import type { ProductRepository } from './domain/product.types.js';
 import { PRODUCT_REPOSITORY } from './domain/product.types.js';
 import {
-  CreateProductDto,
-  ListProductsQueryDto,
-  UpdateProductDto,
+    CreateProductDto,
+    ListProductsQueryDto,
+    UpdateProductDto,
 } from './dto/product.dto.js';
 
 @Injectable()
@@ -38,10 +40,10 @@ export class ProductsService {
     }
   }
 
-  async list(userId: string, query: ListProductsQueryDto) {
+  async list(user: AuthenticatedUser, query: ListProductsQueryDto) {
     const search = query.search?.trim() || undefined;
     const result = await this.products.findMany(
-      userId,
+      { userId: user.id, role: user.role },
       search,
       paginationOffset(query.page, query.pageSize),
       query.pageSize,
@@ -87,9 +89,16 @@ export class ProductsService {
     }
   }
 
-  async delete(userId: string, id: string): Promise<void> {
+  async delete(user: AuthenticatedUser, id: string): Promise<void> {
+    if (user.role !== 'ADMIN') {
+      throw new ForbiddenException(
+        'You are not allowed to perform this action.',
+      );
+    }
     try {
-      if (!(await this.products.delete(userId, id))) {
+      if (
+        !(await this.products.delete({ userId: user.id, role: user.role }, id))
+      ) {
         throw new NotFoundException('Product not found.');
       }
     } catch (error: unknown) {

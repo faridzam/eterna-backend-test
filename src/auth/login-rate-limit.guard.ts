@@ -1,9 +1,9 @@
 import {
-    CanActivate,
-    ExecutionContext,
-    HttpException,
-    HttpStatus,
-    Injectable,
+  CanActivate,
+  ExecutionContext,
+  HttpException,
+  HttpStatus,
+  Injectable,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { AppConfigService } from '../config/app-config.service.js';

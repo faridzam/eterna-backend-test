@@ -14,11 +14,14 @@ import {
     ApiBadRequestResponse,
     ApiConflictResponse,
     ApiCreatedResponse,
+    ApiExtraModels,
+    ApiForbiddenResponse,
     ApiNotFoundResponse,
     ApiOkResponse,
     ApiOperation,
     ApiTags,
     ApiUnauthorizedResponse,
+    getSchemaPath,
 } from '@nestjs/swagger';
 import { CsrfOriginGuard } from '../auth/csrf-origin.guard.js';
 import { Roles } from '../auth/roles.decorator.js';
@@ -28,6 +31,7 @@ import { SessionAuthGuard } from '../auth/session-auth.guard.js';
 import {
     CreateProductDto,
     ListProductsQueryDto,
+    ProductOwnerResponseDto,
     UpdateProductDto,
 } from './dto/product.dto.js';
 import { ProductsService } from './products.service.js';
@@ -39,8 +43,16 @@ function authenticatedUserId(request: AuthenticatedRequest): string {
   return request.authenticatedUser.id;
 }
 
+function authenticatedUser(request: AuthenticatedRequest) {
+  if (request.authenticatedUser === undefined) {
+    throw new Error('Authenticated request is missing a user.');
+  }
+  return request.authenticatedUser;
+}
+
 @Controller('products')
 @ApiTags('products')
+@ApiExtraModels(ProductOwnerResponseDto)
 @UseGuards(SessionAuthGuard)
 export class ProductsController {
   constructor(private readonly products: ProductsService) {}
@@ -66,7 +78,29 @@ export class ProductsController {
 
   @Get()
   @ApiOperation({ summary: 'List active products' })
-  @ApiOkResponse({ description: 'Products retrieved successfully.' })
+  @ApiOkResponse({
+    description:
+      'Products retrieved successfully. Admin items include a sanitized owner with id, name, and email.',
+    schema: {
+      properties: {
+        data: {
+          properties: {
+            items: {
+              items: {
+                properties: {
+                  owner: { $ref: getSchemaPath(ProductOwnerResponseDto) },
+                },
+                type: 'object',
+              },
+              type: 'array',
+            },
+          },
+          type: 'object',
+        },
+      },
+      type: 'object',
+    },
+  })
   @ApiUnauthorizedResponse({ description: 'Authentication is required.' })
   async list(
     @Req() request: AuthenticatedRequest,
@@ -74,7 +108,7 @@ export class ProductsController {
   ) {
     return {
       message: 'Products retrieved successfully.',
-      data: await this.products.list(authenticatedUserId(request), query),
+      data: await this.products.list(authenticatedUser(request), query),
     };
   }
 
@@ -118,11 +152,14 @@ export class ProductsController {
     description: 'Product not found, including already deleted products.',
   })
   @ApiUnauthorizedResponse({ description: 'Authentication is required.' })
+  @ApiForbiddenResponse({
+    description: 'You are not allowed to perform this action.',
+  })
   @UseGuards(CsrfOriginGuard)
   @UseGuards(RolesGuard)
   @Roles('ADMIN')
   async delete(@Req() request: AuthenticatedRequest, @Param('id') id: string) {
-    await this.products.delete(authenticatedUserId(request), id);
+    await this.products.delete(authenticatedUser(request), id);
     return { message: 'Product deleted successfully.', data: null };
   }
 }

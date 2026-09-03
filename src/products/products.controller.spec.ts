@@ -1,15 +1,15 @@
 import {
-  ExecutionContext,
-  INestApplication,
-  NotFoundException,
+    ExecutionContext,
+    INestApplication,
+    NotFoundException,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { afterEach, describe, it, vi } from 'vitest';
 import {
-  AuthenticatedRequest,
-  SessionAuthGuard,
+    AuthenticatedRequest,
+    SessionAuthGuard,
 } from '../auth/session-auth.guard.js';
 import { HttpExceptionFilter } from '../common/filters/http-exception.filter.js';
 import { AppConfigService } from '../config/app-config.service.js';
@@ -46,6 +46,7 @@ describe('ProductsController', () => {
             id: 'user-1',
             name: 'Ada',
             email: 'ada@example.com',
+            role: 'STAFF',
             createdAt: new Date(),
           };
           return true;

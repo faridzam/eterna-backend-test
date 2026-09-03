@@ -1,20 +1,20 @@
 import {
-    BadRequestException,
-    ConflictException,
-    NotFoundException,
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
 } from '@nestjs/common';
 import { InvoiceStatus } from '@prisma/client';
 import { describe, expect, it } from 'vitest';
 import { AppConfigService } from '../config/app-config.service.js';
 import {
-    ProductRecord,
-    ProductRepository,
+  ProductRecord,
+  ProductRepository,
 } from '../products/domain/product.types.js';
 import {
-    CreateInvoiceRecord,
-    InvoicePage,
-    InvoiceRecord,
-    InvoiceRepository,
+  CreateInvoiceRecord,
+  InvoicePage,
+  InvoiceRecord,
+  InvoiceRepository,
 } from './domain/invoice.types.js';
 import { InvoicesService } from './invoices.service.js';
 

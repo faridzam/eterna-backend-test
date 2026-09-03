@@ -4,28 +4,28 @@ import * as argon2 from 'argon2';
 const prisma = new PrismaClient();
 
 async function seed(): Promise<void> {
-  const passwordHash = await argon2.hash('stockflow-demo-password', {
+  const passwordHash = await argon2.hash('stockflow', {
     type: argon2.argon2id,
   });
   const user = await prisma.user.upsert({
-    where: { email: 'demo@stockflow.local' },
-    update: { name: 'StockFlow Demo', passwordHash, role: 'ADMIN' },
+    where: { email: 'admin@stockflow.com' },
+    update: { name: 'StockFlow Admin', passwordHash, role: 'ADMIN' },
     create: {
-      name: 'StockFlow Demo',
-      email: 'demo@stockflow.local',
+      name: 'StockFlow Admin',
+      email: 'admin@stockflow.com',
       passwordHash,
       role: 'ADMIN',
     },
   });
-  const staffPasswordHash = await argon2.hash('stockflow-staff-password', {
+  const staffPasswordHash = await argon2.hash('stockflow', {
     type: argon2.argon2id,
   });
-  await prisma.user.upsert({
-    where: { email: 'staff@stockflow.local' },
+  const staff = await prisma.user.upsert({
+    where: { email: 'staff@stockflow.com' },
     update: { name: 'StockFlow Staff', passwordHash: staffPasswordHash, role: 'STAFF' },
     create: {
       name: 'StockFlow Staff',
-      email: 'staff@stockflow.local',
+      email: 'staff@stockflow.com',
       passwordHash: staffPasswordHash,
       role: 'STAFF',
     },
@@ -55,6 +55,14 @@ async function seed(): Promise<void> {
         description: 'A4 shipping-label sheet',
         unitPriceCents: 125,
         quantityOnHand: 120,
+      },
+      {
+        userId: staff.id,
+        sku: 'SF-400',
+        name: 'Pallet wrap',
+        description: 'Stretch wrap for pallets',
+        unitPriceCents: 850,
+        quantityOnHand: 25,
       },
     ],
     skipDuplicates: true,

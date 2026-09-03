@@ -97,7 +97,7 @@ describe('cookie-backed authentication', () => {
       'raw-session-token',
     );
     expect(harness.products.list).toHaveBeenCalledWith(
-      user.id,
+      user,
       expect.objectContaining({ page: '1', pageSize: '10' }),
     );
   });

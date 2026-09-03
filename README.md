@@ -69,14 +69,12 @@ The frontend has its own `eterna-frontend-test/.env.example`, containing `NEXT_P
 
 ## Seed data
 
-`npm run db:seed` creates or updates the demo account and three products:
+`npm run db:seed` creates or updates the admin and staff accounts and four products:
 
-- Email: `demo@stockflow.local`
-- Password: `stockflow-demo-password`
-- Admin email: `demo@stockflow.local` / `stockflow-demo-password`
-- Staff email: `staff@stockflow.local` / `stockflow-staff-password`
+- Admin email: `admin@stockflow.com` / `stockflow`
+- Staff email: `staff@stockflow.com` / `stockflow`
 
-The seed uses an upsert for the user and skips duplicate products, so it is safe to run repeatedly on the local database.
+The seed uses user upserts and skips duplicate products, so it is safe to run repeatedly on the local database. It creates products owned by both users for verifying the admin cross-user view.
 
 Admins can perform every operation. Staff can view, create, and update products and invoices, but product deletion is rejected with `403` by the backend. The frontend hides the delete action for staff as a convenience only.
 

@@ -1,16 +1,28 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
-  IsInt,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  Max,
-  MaxLength,
-  Min,
+    IsInt,
+    IsNotEmpty,
+    IsOptional,
+    IsString,
+    Max,
+    MaxLength,
+    Min,
 } from 'class-validator';
 
 const trimString = ({ value }: { value: unknown }): unknown =>
   typeof value === 'string' ? value.trim() : value;
+
+export class ProductOwnerResponseDto {
+  @ApiProperty({ description: 'Owner identifier' })
+  declare id: string;
+
+  @ApiProperty({ description: 'Owner display name' })
+  declare name: string;
+
+  @ApiProperty({ description: 'Owner email address' })
+  declare email: string;
+}
 
 export class CreateProductDto {
   @Transform(trimString)

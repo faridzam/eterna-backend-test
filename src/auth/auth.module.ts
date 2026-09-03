@@ -3,13 +3,13 @@ import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { CsrfOriginGuard } from './csrf-origin.guard.js';
 import {
-    SESSION_REPOSITORY,
-    USER_REPOSITORY,
+  SESSION_REPOSITORY,
+  USER_REPOSITORY,
 } from './domain/auth.repository.js';
 import { LoginRateLimitGuard } from './login-rate-limit.guard.js';
 import {
-    PrismaSessionRepository,
-    PrismaUserRepository,
+  PrismaSessionRepository,
+  PrismaUserRepository,
 } from './repositories/prisma-auth.repository.js';
 import { RolesGuard } from './roles.guard.js';
 import { SessionAuthGuard } from './session-auth.guard.js';
