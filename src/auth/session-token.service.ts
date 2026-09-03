@@ -11,6 +11,8 @@ export class SessionTokenService {
   }
 
   hash(rawToken: string): string {
-    return createHmac('sha256', this.config.sessionTokenPepper).update(rawToken).digest('hex');
+    return createHmac('sha256', this.config.sessionTokenPepper)
+      .update(rawToken)
+      .digest('hex');
   }
 }

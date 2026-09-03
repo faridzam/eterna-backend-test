@@ -3,7 +3,10 @@ import { AppConfigService } from '../config/app-config.service.js';
 
 export const SESSION_COOKIE_NAME = 'stockflow_session';
 
-export function sessionCookieOptions(config: AppConfigService, expiresAt: Date): CookieOptions {
+export function sessionCookieOptions(
+  config: AppConfigService,
+  expiresAt: Date,
+): CookieOptions {
   return {
     httpOnly: true,
     sameSite: 'lax',
@@ -14,7 +17,9 @@ export function sessionCookieOptions(config: AppConfigService, expiresAt: Date):
   };
 }
 
-export function clearSessionCookieOptions(config: AppConfigService): CookieOptions {
+export function clearSessionCookieOptions(
+  config: AppConfigService,
+): CookieOptions {
   return {
     httpOnly: true,
     sameSite: 'lax',

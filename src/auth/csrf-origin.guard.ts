@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { AppConfigService } from '../config/app-config.service.js';
 
@@ -20,7 +25,10 @@ export class CsrfOriginGuard implements CanActivate {
     const origin = headerValue(request, 'origin');
     const referer = headerValue(request, 'referer');
     const requestOrigin = origin ?? this.originFromReferer(referer);
-    if (requestOrigin === undefined || !this.config.corsOrigins.includes(requestOrigin)) {
+    if (
+      requestOrigin === undefined ||
+      !this.config.corsOrigins.includes(requestOrigin)
+    ) {
       throw new ForbiddenException('Request origin is not allowed.');
     }
     return true;

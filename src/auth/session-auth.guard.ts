@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { AuthService } from './auth.service.js';
 import { AuthenticatedUser } from './domain/auth.types.js';
@@ -24,7 +29,10 @@ export class SessionAuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const rawToken = readCookie(request, SESSION_COOKIE_NAME);
-    const user = rawToken === undefined ? null : await this.authService.getAuthenticatedUser(rawToken);
+    const user =
+      rawToken === undefined
+        ? null
+        : await this.authService.getAuthenticatedUser(rawToken);
     if (user === null) {
       throw new UnauthorizedException('Authentication is required.');
     }

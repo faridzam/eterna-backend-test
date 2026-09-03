@@ -45,7 +45,17 @@ export interface CreateInvoiceRecord {
   readonly items: readonly Omit<InvoiceItemRecord, 'id' | 'invoiceId'>[];
 }
 
-export type UpdateDraftInvoiceRecord = Pick<CreateInvoiceRecord, 'customerName' | 'issueDate' | 'dueDate' | 'notes' | 'subtotalCents' | 'taxAmountCents' | 'totalCents' | 'items'>;
+export type UpdateDraftInvoiceRecord = Pick<
+  CreateInvoiceRecord,
+  | 'customerName'
+  | 'issueDate'
+  | 'dueDate'
+  | 'notes'
+  | 'subtotalCents'
+  | 'taxAmountCents'
+  | 'totalCents'
+  | 'items'
+>;
 
 export class InsufficientStockError extends Error {
   constructor(readonly productName: string) {
@@ -63,10 +73,32 @@ export const INVOICE_REPOSITORY = Symbol('INVOICE_REPOSITORY');
 
 export interface InvoiceRepository {
   create(input: CreateInvoiceRecord): Promise<InvoiceRecord>;
-  updateDraft(userId: string, id: string, input: UpdateDraftInvoiceRecord): Promise<boolean>;
+  updateDraft(
+    userId: string,
+    id: string,
+    input: UpdateDraftInvoiceRecord,
+  ): Promise<boolean>;
   findById(userId: string, id: string): Promise<InvoiceRecord | null>;
-  findMany(userId: string, status: InvoiceStatus | undefined, skip: number, take: number): Promise<InvoicePage>;
-  issue(userId: string, id: string, items: readonly InvoiceItemRecord[]): Promise<boolean>;
-  transition(userId: string, id: string, from: InvoiceStatus, to: InvoiceStatus): Promise<boolean>;
-  cancelIssued(userId: string, id: string, items: readonly InvoiceItemRecord[]): Promise<boolean>;
+  findMany(
+    userId: string,
+    status: InvoiceStatus | undefined,
+    skip: number,
+    take: number,
+  ): Promise<InvoicePage>;
+  issue(
+    userId: string,
+    id: string,
+    items: readonly InvoiceItemRecord[],
+  ): Promise<boolean>;
+  transition(
+    userId: string,
+    id: string,
+    from: InvoiceStatus,
+    to: InvoiceStatus,
+  ): Promise<boolean>;
+  cancelIssued(
+    userId: string,
+    id: string,
+    items: readonly InvoiceItemRecord[],
+  ): Promise<boolean>;
 }

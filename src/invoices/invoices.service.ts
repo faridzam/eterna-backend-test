@@ -1,13 +1,31 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InvoiceStatus } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 import { paginationOffset } from '../common/pagination.js';
 import { AppConfigService } from '../config/app-config.service.js';
 import type { ProductRepository } from '../products/domain/product.types.js';
 import { PRODUCT_REPOSITORY } from '../products/domain/product.types.js';
-import type { InvoiceRecord, InvoiceRepository } from './domain/invoice.types.js';
-import { INVOICE_REPOSITORY, InsufficientStockError, TransactionConflictError, type UpdateDraftInvoiceRecord } from './domain/invoice.types.js';
-import { CreateInvoiceDto, ListInvoicesQueryDto, UpdateInvoiceDto } from './dto/invoice.dto.js';
+import type {
+  InvoiceRecord,
+  InvoiceRepository,
+} from './domain/invoice.types.js';
+import {
+  INVOICE_REPOSITORY,
+  InsufficientStockError,
+  TransactionConflictError,
+  type UpdateDraftInvoiceRecord,
+} from './domain/invoice.types.js';
+import {
+  CreateInvoiceDto,
+  ListInvoicesQueryDto,
+  UpdateInvoiceDto,
+} from './dto/invoice.dto.js';
 
 @Injectable()
 export class InvoicesService {
@@ -17,17 +35,32 @@ export class InvoicesService {
     private readonly config: AppConfigService,
   ) {}
 
-  async create(userId: string, input: CreateInvoiceDto): Promise<InvoiceRecord> {
+  async create(
+    userId: string,
+    input: CreateInvoiceDto,
+  ): Promise<InvoiceRecord> {
     const resolved = await this.resolveInvoice(userId, input);
-    return this.invoices.create({ ...resolved, userId, invoiceNumber: this.invoiceNumber() });
+    return this.invoices.create({
+      ...resolved,
+      userId,
+      invoiceNumber: this.invoiceNumber(),
+    });
   }
 
-  async updateDraft(userId: string, id: string, input: UpdateInvoiceDto): Promise<InvoiceRecord> {
+  async updateDraft(
+    userId: string,
+    id: string,
+    input: UpdateInvoiceDto,
+  ): Promise<InvoiceRecord> {
     const existing = await this.requireInvoice(userId, id);
     if (existing.status !== InvoiceStatus.DRAFT) {
       throw new ConflictException('Only draft invoices can be edited.');
     }
-    const updated = await this.invoices.updateDraft(userId, id, await this.resolveInvoice(userId, input));
+    const updated = await this.invoices.updateDraft(
+      userId,
+      id,
+      await this.resolveInvoice(userId, input),
+    );
     if (!updated) {
       throw new ConflictException('Only draft invoices can be edited.');
     }
@@ -35,7 +68,12 @@ export class InvoicesService {
   }
 
   async list(userId: string, query: ListInvoicesQueryDto) {
-    const result = await this.invoices.findMany(userId, query.status, paginationOffset(query.page, query.pageSize), query.pageSize);
+    const result = await this.invoices.findMany(
+      userId,
+      query.status,
+      paginationOffset(query.page, query.pageSize),
+      query.pageSize,
+    );
     return { ...result, page: query.page, pageSize: query.pageSize };
   }
 
@@ -43,9 +81,16 @@ export class InvoicesService {
     return this.requireInvoice(userId, id);
   }
 
-  async changeStatus(userId: string, id: string, status: InvoiceStatus): Promise<InvoiceRecord> {
+  async changeStatus(
+    userId: string,
+    id: string,
+    status: InvoiceStatus,
+  ): Promise<InvoiceRecord> {
     const invoice = await this.requireInvoice(userId, id);
-    if (invoice.status === InvoiceStatus.DRAFT && status === InvoiceStatus.ISSUED) {
+    if (
+      invoice.status === InvoiceStatus.DRAFT &&
+      status === InvoiceStatus.ISSUED
+    ) {
       try {
         if (await this.invoices.issue(userId, id, invoice.items)) {
           return this.requireInvoice(userId, id);
@@ -59,15 +104,38 @@ export class InvoicesService {
         }
         throw error;
       }
-    } else if (invoice.status === InvoiceStatus.ISSUED && status === InvoiceStatus.PAID) {
-      if (await this.invoices.transition(userId, id, InvoiceStatus.ISSUED, InvoiceStatus.PAID)) {
+    } else if (
+      invoice.status === InvoiceStatus.ISSUED &&
+      status === InvoiceStatus.PAID
+    ) {
+      if (
+        await this.invoices.transition(
+          userId,
+          id,
+          InvoiceStatus.ISSUED,
+          InvoiceStatus.PAID,
+        )
+      ) {
         return this.requireInvoice(userId, id);
       }
-    } else if (invoice.status === InvoiceStatus.DRAFT && status === InvoiceStatus.CANCELLED) {
-      if (await this.invoices.transition(userId, id, InvoiceStatus.DRAFT, InvoiceStatus.CANCELLED)) {
+    } else if (
+      invoice.status === InvoiceStatus.DRAFT &&
+      status === InvoiceStatus.CANCELLED
+    ) {
+      if (
+        await this.invoices.transition(
+          userId,
+          id,
+          InvoiceStatus.DRAFT,
+          InvoiceStatus.CANCELLED,
+        )
+      ) {
         return this.requireInvoice(userId, id);
       }
-    } else if (invoice.status === InvoiceStatus.ISSUED && status === InvoiceStatus.CANCELLED) {
+    } else if (
+      invoice.status === InvoiceStatus.ISSUED &&
+      status === InvoiceStatus.CANCELLED
+    ) {
       try {
         if (await this.invoices.cancelIssued(userId, id, invoice.items)) {
           return this.requireInvoice(userId, id);
@@ -79,22 +147,33 @@ export class InvoicesService {
         throw error;
       }
     }
-    throw new ConflictException('This invoice status transition is not allowed.');
+    throw new ConflictException(
+      'This invoice status transition is not allowed.',
+    );
   }
 
   private validateLineItems(input: CreateInvoiceDto): void {
     const uniqueProductIds = new Set(input.items.map((item) => item.productId));
     if (uniqueProductIds.size !== input.items.length) {
-      throw new BadRequestException('Each product may appear only once on an invoice.');
+      throw new BadRequestException(
+        'Each product may appear only once on an invoice.',
+      );
     }
   }
 
-  private async resolveInvoice(userId: string, input: CreateInvoiceDto): Promise<UpdateDraftInvoiceRecord> {
+  private async resolveInvoice(
+    userId: string,
+    input: CreateInvoiceDto,
+  ): Promise<UpdateDraftInvoiceRecord> {
     this.validateLineItems(input);
-    const products = await Promise.all(input.items.map((item) => this.products.findById(userId, item.productId)));
+    const products = await Promise.all(
+      input.items.map((item) => this.products.findById(userId, item.productId)),
+    );
     const missingIndex = products.findIndex((product) => product === null);
     if (missingIndex >= 0) {
-      throw new NotFoundException(`Product ${input.items[missingIndex].productId} was not found.`);
+      throw new NotFoundException(
+        `Product ${input.items[missingIndex].productId} was not found.`,
+      );
     }
     const items = input.items.map((item, index) => {
       const product = products[index];
@@ -102,20 +181,45 @@ export class InvoicesService {
         throw new NotFoundException(`Product ${item.productId} was not found.`);
       }
       if (item.quantity > product.quantityOnHand) {
-        throw new BadRequestException(`Insufficient stock for ${product.name}.`);
+        throw new BadRequestException(
+          `Insufficient stock for ${product.name}.`,
+        );
       }
-      return { productId: product.id, productName: product.name, unitPriceCents: product.unitPriceCents, quantity: item.quantity, lineTotalCents: product.unitPriceCents * item.quantity };
+      return {
+        productId: product.id,
+        productName: product.name,
+        unitPriceCents: product.unitPriceCents,
+        quantity: item.quantity,
+        lineTotalCents: product.unitPriceCents * item.quantity,
+      };
     });
-    const subtotalCents = items.reduce((total, item) => total + item.lineTotalCents, 0);
-    const taxAmountCents = Math.round((subtotalCents * this.config.taxRateBasisPoints) / 10000);
-    return { customerName: input.customerName.trim(), issueDate: new Date(input.issueDate), dueDate: input.dueDate === undefined ? null : new Date(input.dueDate), notes: input.notes?.trim() || null, subtotalCents, taxAmountCents, totalCents: subtotalCents + taxAmountCents, items };
+    const subtotalCents = items.reduce(
+      (total, item) => total + item.lineTotalCents,
+      0,
+    );
+    const taxAmountCents = Math.round(
+      (subtotalCents * this.config.taxRateBasisPoints) / 10000,
+    );
+    return {
+      customerName: input.customerName.trim(),
+      issueDate: new Date(input.issueDate),
+      dueDate: input.dueDate === undefined ? null : new Date(input.dueDate),
+      notes: input.notes?.trim() || null,
+      subtotalCents,
+      taxAmountCents,
+      totalCents: subtotalCents + taxAmountCents,
+      items,
+    };
   }
 
   private invoiceNumber(): string {
     return `INV-${new Date().getUTCFullYear()}-${randomBytes(5).toString('hex').toUpperCase()}`;
   }
 
-  private async requireInvoice(userId: string, id: string): Promise<InvoiceRecord> {
+  private async requireInvoice(
+    userId: string,
+    id: string,
+  ): Promise<InvoiceRecord> {
     const invoice = await this.invoices.findById(userId, id);
     if (invoice === null) {
       throw new NotFoundException('Invoice not found.');

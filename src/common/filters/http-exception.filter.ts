@@ -1,4 +1,10 @@
-import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { Response } from 'express';
 
 @Catch()
@@ -8,7 +14,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       const exceptionResponse: unknown = exception.getResponse();
       const message = this.messageFrom(exceptionResponse);
-      response.status(exception.getStatus()).json({ status: exception.getStatus(), message, data: null });
+      response
+        .status(exception.getStatus())
+        .json({ status: exception.getStatus(), message, data: null });
       return;
     }
 
@@ -23,17 +31,29 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (typeof response === 'string') {
       return this.safeMessage(response);
     }
-    if (typeof response === 'object' && response !== null && 'message' in response) {
+    if (
+      typeof response === 'object' &&
+      response !== null &&
+      'message' in response
+    ) {
       const message: unknown = response.message;
-      if (typeof message === 'string' || (Array.isArray(message) && message.every((item) => typeof item === 'string'))) {
-        return Array.isArray(message) ? message.map((item) => this.safeMessage(item)) : this.safeMessage(message);
+      if (
+        typeof message === 'string' ||
+        (Array.isArray(message) &&
+          message.every((item) => typeof item === 'string'))
+      ) {
+        return Array.isArray(message)
+          ? message.map((item) => this.safeMessage(item))
+          : this.safeMessage(message);
       }
     }
     return 'Request failed.';
   }
 
   private safeMessage(message: string): string {
-    return /passwordhash|token|secret|stack|database|prisma|sql|authorization/i.test(message)
+    return /passwordhash|token|secret|stack|database|prisma|sql|authorization/i.test(
+      message,
+    )
       ? 'Request failed.'
       : message;
   }

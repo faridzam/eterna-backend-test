@@ -1,4 +1,13 @@
-import { Body, Controller, Get, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiCreatedResponse, ApiResponse } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { AppConfigService } from '../config/app-config.service.js';
@@ -9,11 +18,17 @@ import { RegisterResponseDto } from './dto/register-response.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
 import type { AuthenticatedRequest } from './session-auth.guard.js';
 import { SessionAuthGuard } from './session-auth.guard.js';
-import { clearSessionCookieOptions, SESSION_COOKIE_NAME, sessionCookieOptions } from './session-cookie.js';
+import {
+  clearSessionCookieOptions,
+  SESSION_COOKIE_NAME,
+  sessionCookieOptions,
+} from './session-cookie.js';
 
 function optionalHeader(request: Request, name: string): string | undefined {
   const value = request.headers[name];
-  return typeof value === 'string' && value.length > 0 ? value.slice(0, 512) : undefined;
+  return typeof value === 'string' && value.length > 0
+    ? value.slice(0, 512)
+    : undefined;
 }
 
 @Controller('auth')
@@ -26,19 +41,30 @@ export class AuthController {
   @Post('register')
   @ApiCreatedResponse({ type: RegisterResponseDto })
   @ApiResponse({ status: 400, description: 'Invalid registration input.' })
-  @ApiResponse({ status: 409, description: 'An account already exists for that email address.' })
+  @ApiResponse({
+    status: 409,
+    description: 'An account already exists for that email address.',
+  })
   async register(@Body() input: RegisterDto) {
     return this.authService.register(input);
   }
 
   @Post('login')
   @HttpCode(200)
-  async login(@Body() input: LoginDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+  async login(
+    @Body() input: LoginDto,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
     const result = await this.authService.login(input, {
       userAgent: optionalHeader(request, 'user-agent'),
       ipAddress: request.ip,
     });
-    response.cookie(SESSION_COOKIE_NAME, result.rawToken, sessionCookieOptions(this.config, result.expiresAt));
+    response.cookie(
+      SESSION_COOKIE_NAME,
+      result.rawToken,
+      sessionCookieOptions(this.config, result.expiresAt),
+    );
     return { data: { user: result.user } };
   }
 
@@ -51,10 +77,21 @@ export class AuthController {
   @Post('logout')
   @HttpCode(204)
   @UseGuards(CsrfOriginGuard)
-  async logout(@Req() request: Request, @Res({ passthrough: true }) response: Response): Promise<void> {
+  async logout(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<void> {
     const cookies: unknown = request.cookies;
-    const value: unknown = typeof cookies === 'object' && cookies !== null ? Reflect.get(cookies, SESSION_COOKIE_NAME) : undefined;
-    await this.authService.logout(typeof value === 'string' ? value : undefined);
-    response.clearCookie(SESSION_COOKIE_NAME, clearSessionCookieOptions(this.config));
+    const value: unknown =
+      typeof cookies === 'object' && cookies !== null
+        ? Reflect.get(cookies, SESSION_COOKIE_NAME)
+        : undefined;
+    await this.authService.logout(
+      typeof value === 'string' ? value : undefined,
+    );
+    response.clearCookie(
+      SESSION_COOKIE_NAME,
+      clearSessionCookieOptions(this.config),
+    );
   }
 }

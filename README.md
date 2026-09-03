@@ -20,18 +20,18 @@ See `.env.example`. `DATABASE_URL`, `FRONTEND_ORIGIN`, `CORS_ORIGINS`, `SESSION_
 
 ## API
 
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| POST | `/auth/register` | Register a user |
-| POST | `/auth/login` | Set opaque session cookie |
-| GET | `/auth/me` | Read authenticated user |
-| POST | `/auth/logout` | Revoke session and clear cookie |
-| GET/POST | `/products` | List/create active products owned by the session user |
-| GET/PATCH/DELETE | `/products/:id` | Read/update/soft-delete an owned active product |
-| GET/POST | `/invoices` | List/create owned invoices |
-| GET | `/invoices/:id` | Read an owned invoice |
-| PATCH | `/invoices/:id` | Edit an owned DRAFT invoice |
-| PATCH | `/invoices/:id/status` | Issue, pay, or cancel an invoice |
+| Method           | Endpoint               | Purpose                                               |
+| ---------------- | ---------------------- | ----------------------------------------------------- |
+| POST             | `/auth/register`       | Register a user                                       |
+| POST             | `/auth/login`          | Set opaque session cookie                             |
+| GET              | `/auth/me`             | Read authenticated user                               |
+| POST             | `/auth/logout`         | Revoke session and clear cookie                       |
+| GET/POST         | `/products`            | List/create active products owned by the session user |
+| GET/PATCH/DELETE | `/products/:id`        | Read/update/soft-delete an owned active product       |
+| GET/POST         | `/invoices`            | List/create owned invoices                            |
+| GET              | `/invoices/:id`        | Read an owned invoice                                 |
+| PATCH            | `/invoices/:id`        | Edit an owned DRAFT invoice                           |
+| PATCH            | `/invoices/:id/status` | Issue, pay, or cancel an invoice                      |
 
 All protected routes use the `stockflow_session` HttpOnly, `SameSite=Lax` cookie. State-changing operations require an allowed `Origin` or `Referer`, and CORS permits only explicit configured origins with credentials. Passwords use Argon2id. Session rows contain an HMAC-SHA-256 hash of a cryptographically random token, never the raw cookie value. Product and invoice repositories scope every record operation by the authenticated user ID. Product deletes set `deletedAt` and return `404` for missing, foreign-owned, or already deleted products; rows and invoice references are preserved, and SKUs can be reused after deletion. Active product reads always filter deleted rows.
 

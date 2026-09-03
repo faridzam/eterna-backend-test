@@ -1,12 +1,24 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { paginationOffset } from '../common/pagination.js';
 import type { ProductRepository } from './domain/product.types.js';
 import { PRODUCT_REPOSITORY } from './domain/product.types.js';
-import { CreateProductDto, ListProductsQueryDto, UpdateProductDto } from './dto/product.dto.js';
+import {
+  CreateProductDto,
+  ListProductsQueryDto,
+  UpdateProductDto,
+} from './dto/product.dto.js';
 
 @Injectable()
 export class ProductsService {
-  constructor(@Inject(PRODUCT_REPOSITORY) private readonly products: ProductRepository) {}
+  constructor(
+    @Inject(PRODUCT_REPOSITORY) private readonly products: ProductRepository,
+  ) {}
 
   async create(userId: string, input: CreateProductDto) {
     try {
@@ -28,7 +40,12 @@ export class ProductsService {
 
   async list(userId: string, query: ListProductsQueryDto) {
     const search = query.search?.trim() || undefined;
-    const result = await this.products.findMany(userId, search, paginationOffset(query.page, query.pageSize), query.pageSize);
+    const result = await this.products.findMany(
+      userId,
+      search,
+      paginationOffset(query.page, query.pageSize),
+      query.pageSize,
+    );
     return { ...result, page: query.page, pageSize: query.pageSize };
   }
 
@@ -38,13 +55,24 @@ export class ProductsService {
 
   async update(userId: string, id: string, input: UpdateProductDto) {
     const update = {
-      ...(input.sku === undefined ? {} : { sku: input.sku.trim().toUpperCase() }),
+      ...(input.sku === undefined
+        ? {}
+        : { sku: input.sku.trim().toUpperCase() }),
       ...(input.name === undefined ? {} : { name: input.name.trim() }),
-      ...(input.description === undefined ? {} : { description: input.description.trim() || null }),
-      ...(input.unitPriceCents === undefined ? {} : { unitPriceCents: input.unitPriceCents }),
-      ...(input.quantityOnHand === undefined ? {} : { quantityOnHand: input.quantityOnHand }),
+      ...(input.description === undefined
+        ? {}
+        : { description: input.description.trim() || null }),
+      ...(input.unitPriceCents === undefined
+        ? {}
+        : { unitPriceCents: input.unitPriceCents }),
+      ...(input.quantityOnHand === undefined
+        ? {}
+        : { quantityOnHand: input.quantityOnHand }),
     };
-    if (Object.keys(update).length === 0) throw new BadRequestException('At least one product field must be provided.');
+    if (Object.keys(update).length === 0)
+      throw new BadRequestException(
+        'At least one product field must be provided.',
+      );
     try {
       const product = await this.products.update(userId, id, update);
       if (product === null) {
@@ -66,7 +94,9 @@ export class ProductsService {
       }
     } catch (error: unknown) {
       if (error instanceof Error && 'code' in error && error.code === 'P2003') {
-        throw new ConflictException('Products referenced by invoices cannot be deleted.');
+        throw new ConflictException(
+          'Products referenced by invoices cannot be deleted.',
+        );
       }
       throw error;
     }

@@ -8,7 +8,14 @@ import { InvoicesModule } from './invoices/invoices.module.js';
 import { ProductsModule } from './products/products.module.js';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), StockFlowConfigModule, DatabaseModule, AuthModule, ProductsModule, InvoicesModule],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    StockFlowConfigModule,
+    DatabaseModule,
+    AuthModule,
+    ProductsModule,
+    InvoicesModule,
+  ],
   controllers: [HealthController],
 })
 export class AppModule {}

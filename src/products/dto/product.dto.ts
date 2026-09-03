@@ -1,7 +1,16 @@
 import { Transform, Type } from 'class-transformer';
-import { IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
-const trimString = ({ value }: { value: unknown }): unknown => typeof value === 'string' ? value.trim() : value;
+const trimString = ({ value }: { value: unknown }): unknown =>
+  typeof value === 'string' ? value.trim() : value;
 
 export class CreateProductDto {
   @Transform(trimString)

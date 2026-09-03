@@ -15,7 +15,10 @@ async function bootstrap() {
   app.use(cookieParser());
   app.use(helmet());
   app.enableCors({
-    origin: (origin: string | undefined, callback: (error: Error | null, allowed?: boolean) => void) => {
+    origin: (
+      origin: string | undefined,
+      callback: (error: Error | null, allowed?: boolean) => void,
+    ) => {
       if (origin === undefined || config.corsOrigins.includes(origin)) {
         callback(null, true);
         return;
@@ -25,14 +28,24 @@ async function bootstrap() {
     credentials: true,
   });
   app.useGlobalFilters(new HttpExceptionFilter());
-  app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
   const swaggerConfig = new DocumentBuilder()
     .setTitle('StockFlow API')
     .setDescription('Authenticated inventory and invoicing API')
     .setVersion('1.0')
     .addCookieAuth('stockflow_session')
     .build();
-  SwaggerModule.setup('api-docs', app, SwaggerModule.createDocument(app, swaggerConfig));
+  SwaggerModule.setup(
+    'api-docs',
+    app,
+    SwaggerModule.createDocument(app, swaggerConfig),
+  );
   await app.listen(config.port);
 }
 await bootstrap();
