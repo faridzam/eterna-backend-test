@@ -3,13 +3,13 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service.js';
 import { DuplicateEmailError } from '../domain/auth.errors.js';
 import {
-  SessionRepository,
-  UserRepository,
+    SessionRepository,
+    UserRepository,
 } from '../domain/auth.repository.js';
 import {
-  SessionMetadata,
-  SessionRecord,
-  UserRecord,
+    SessionMetadata,
+    SessionRecord,
+    UserRecord,
 } from '../domain/auth.types.js';
 
 @Injectable()
@@ -20,6 +20,7 @@ export class PrismaUserRepository implements UserRepository {
     name: string;
     email: string;
     passwordHash: string;
+    role?: 'ADMIN' | 'STAFF';
   }): Promise<UserRecord> {
     try {
       return await this.prisma.user.create({ data: input });

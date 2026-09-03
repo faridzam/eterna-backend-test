@@ -8,6 +8,7 @@ export interface UserRepository {
     name: string;
     email: string;
     passwordHash: string;
+    role?: import('./auth.types.js').UserRole;
   }): Promise<UserRecord>;
   findByEmail(email: string): Promise<UserRecord | null>;
   findById(id: string): Promise<UserRecord | null>;

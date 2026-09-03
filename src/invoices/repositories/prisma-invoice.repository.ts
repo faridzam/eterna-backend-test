@@ -1,9 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { InvoiceStatus, Prisma } from '@prisma/client';
-import { PrismaService } from '../../database/prisma.service.js';
+import {
+  InvoiceStatus,
+  Prisma,
+  PrismaClient,
+  StockMovementReason,
+} from '@prisma/client';
 import type {
   CreateInvoiceRecord,
-  InvoiceItemRecord,
   InvoicePage,
   InvoiceRecord,
   InvoiceRepository,
@@ -20,7 +23,7 @@ const invoiceWithItems = Prisma.validator<Prisma.InvoiceInclude>()({
 
 @Injectable()
 export class PrismaInvoiceRepository implements InvoiceRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaClient) {}
 
   async create(input: CreateInvoiceRecord): Promise<InvoiceRecord> {
     return this.prisma.invoice.create({
@@ -109,18 +112,17 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
   async issue(
     userId: string,
     id: string,
-    items: readonly InvoiceItemRecord[],
   ): Promise<boolean> {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         return await this.prisma.$transaction(
           async (transaction) => {
-            const invoice = await transaction.invoice.updateMany({
+            const invoice = await transaction.invoice.findFirst({
               where: { id, userId, status: InvoiceStatus.DRAFT },
-              data: { status: InvoiceStatus.ISSUED },
+              include: invoiceWithItems,
             });
-            if (invoice.count === 0) return false;
-            for (const item of items) {
+            if (invoice === null) return false;
+            for (const item of invoice.items) {
               const changed = await transaction.product.updateMany({
                 where: {
                   id: item.productId,
@@ -131,6 +133,22 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
               });
               if (changed.count === 0)
                 throw new InsufficientStockError(item.productName);
+              await transaction.stockMovement.create({
+                data: {
+                  productId: item.productId,
+                  userId,
+                  invoiceId: id,
+                  quantityDelta: -item.quantity,
+                  reason: StockMovementReason.INVOICE_ISSUED,
+                },
+              });
+            }
+            const updated = await transaction.invoice.updateMany({
+              where: { id, userId, status: InvoiceStatus.DRAFT },
+              data: { status: InvoiceStatus.ISSUED },
+            });
+            if (updated.count === 0) {
+              throw new TransactionConflictError();
             }
             return true;
           },
@@ -167,23 +185,36 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
   async cancelIssued(
     userId: string,
     id: string,
-    items: readonly InvoiceItemRecord[],
   ): Promise<boolean> {
     try {
       return await this.prisma.$transaction(
         async (transaction) => {
-          const invoice = await transaction.invoice.updateMany({
+          const invoice = await transaction.invoice.findFirst({
             where: { id, userId, status: InvoiceStatus.ISSUED },
-            data: { status: InvoiceStatus.CANCELLED },
+            include: invoiceWithItems,
           });
-          if (invoice.count === 0) {
-            return false;
-          }
-          for (const item of items) {
+          if (invoice === null) return false;
+          for (const item of invoice.items) {
             await transaction.product.updateMany({
               where: { id: item.productId, userId },
               data: { quantityOnHand: { increment: item.quantity } },
             });
+            await transaction.stockMovement.create({
+              data: {
+                productId: item.productId,
+                userId,
+                invoiceId: id,
+                quantityDelta: item.quantity,
+                reason: StockMovementReason.INVOICE_CANCELLED,
+              },
+            });
+          }
+          const updated = await transaction.invoice.updateMany({
+            where: { id, userId, status: InvoiceStatus.ISSUED },
+            data: { status: InvoiceStatus.CANCELLED },
+          });
+          if (updated.count === 0) {
+            throw new TransactionConflictError();
           }
           return true;
         },

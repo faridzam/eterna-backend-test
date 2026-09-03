@@ -29,13 +29,11 @@ describe('cookie-backed authentication', () => {
 
   async function createApp() {
     const auth = {
-      login: vi
-        .fn()
-        .mockResolvedValue({
-          rawToken: 'raw-session-token',
-          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-          user,
-        }),
+      login: vi.fn().mockResolvedValue({
+        rawToken: 'raw-session-token',
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        user,
+      }),
       getAuthenticatedUser: vi
         .fn()
         .mockImplementation(async (token: string) =>
@@ -87,6 +85,7 @@ describe('cookie-backed authentication', () => {
       .get('/auth/me')
       .expect(200)
       .expect({
+        message: 'Authenticated user retrieved successfully.',
         data: {
           id: user.id,
           name: user.name,

@@ -45,6 +45,7 @@ describe('AuthController', () => {
     expect(response.headers['set-cookie']?.join(';')).toContain('HttpOnly');
     expect(response.headers['set-cookie']?.join(';')).toContain('SameSite=Lax');
     expect(response.body).toEqual({
+      message: 'Signed in successfully.',
       data: {
         user: expect.not.objectContaining({
           rawToken: expect.any(String),

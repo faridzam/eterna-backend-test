@@ -1,8 +1,11 @@
+export type UserRole = 'ADMIN' | 'STAFF';
+
 export interface UserRecord {
   readonly id: string;
   readonly name: string;
   readonly email: string;
   readonly passwordHash: string;
+  readonly role: UserRole;
   readonly createdAt: Date;
 }
 
@@ -10,6 +13,7 @@ export interface AuthenticatedUser {
   readonly id: string;
   readonly name: string;
   readonly email: string;
+  readonly role: UserRole;
   readonly createdAt: Date;
 }
 
@@ -34,6 +38,7 @@ export function toAuthenticatedUser(user: UserRecord): AuthenticatedUser {
     id: user.id,
     name: user.name,
     email: user.email,
+    role: user.role,
     createdAt: user.createdAt,
   };
 }

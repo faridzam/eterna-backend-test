@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, StockMovementReason } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service.js';
 import type {
-  CreateProductRecord,
-  ProductPage,
-  ProductRecord,
-  ProductRepository,
-  UpdateProductRecord,
+    CreateProductRecord,
+    ProductPage,
+    ProductRecord,
+    ProductRepository,
+    UpdateProductRecord,
 } from '../domain/product.types.js';
 
 @Injectable()
@@ -14,7 +14,18 @@ export class PrismaProductRepository implements ProductRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(input: CreateProductRecord): Promise<ProductRecord> {
-    return this.prisma.product.create({ data: input });
+    return this.prisma.$transaction(async (transaction) => {
+      const product = await transaction.product.create({ data: input });
+      await transaction.stockMovement.create({
+        data: {
+          productId: product.id,
+          userId: product.userId,
+          quantityDelta: product.quantityOnHand,
+          reason: StockMovementReason.INITIAL_STOCK,
+        },
+      });
+      return product;
+    });
   }
 
   async findById(userId: string, id: string): Promise<ProductRecord | null> {
@@ -60,11 +71,29 @@ export class PrismaProductRepository implements ProductRepository {
     id: string,
     input: UpdateProductRecord,
   ): Promise<ProductRecord | null> {
-    const result = await this.prisma.product.updateMany({
-      where: { id, userId, deletedAt: null },
-      data: input,
+    return this.prisma.$transaction(async (transaction) => {
+      const existing = await transaction.product.findFirst({
+        where: { id, userId, deletedAt: null },
+      });
+      if (existing === null) return null;
+      const result = await transaction.product.updateMany({
+        where: { id, userId, deletedAt: null, updatedAt: existing.updatedAt },
+        data: input,
+      });
+      if (result.count === 0) return null;
+      const nextQuantity = input.quantityOnHand ?? existing.quantityOnHand;
+      if (nextQuantity !== existing.quantityOnHand) {
+        await transaction.stockMovement.create({
+          data: {
+            productId: id,
+            userId,
+            quantityDelta: nextQuantity - existing.quantityOnHand,
+            reason: StockMovementReason.MANUAL_ADJUSTMENT,
+          },
+        });
+      }
+      return transaction.product.findFirst({ where: { id, userId } });
     });
-    return result.count === 0 ? null : this.findById(userId, id);
   }
 
   async delete(userId: string, id: string): Promise<boolean> {

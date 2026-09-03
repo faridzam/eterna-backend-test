@@ -9,11 +9,25 @@ async function seed(): Promise<void> {
   });
   const user = await prisma.user.upsert({
     where: { email: 'demo@stockflow.local' },
-    update: { name: 'StockFlow Demo', passwordHash },
+    update: { name: 'StockFlow Demo', passwordHash, role: 'ADMIN' },
     create: {
       name: 'StockFlow Demo',
       email: 'demo@stockflow.local',
       passwordHash,
+      role: 'ADMIN',
+    },
+  });
+  const staffPasswordHash = await argon2.hash('stockflow-staff-password', {
+    type: argon2.argon2id,
+  });
+  await prisma.user.upsert({
+    where: { email: 'staff@stockflow.local' },
+    update: { name: 'StockFlow Staff', passwordHash: staffPasswordHash, role: 'STAFF' },
+    create: {
+      name: 'StockFlow Staff',
+      email: 'staff@stockflow.local',
+      passwordHash: staffPasswordHash,
+      role: 'STAFF',
     },
   });
   await prisma.product.createMany({

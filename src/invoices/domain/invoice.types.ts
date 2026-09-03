@@ -88,7 +88,6 @@ export interface InvoiceRepository {
   issue(
     userId: string,
     id: string,
-    items: readonly InvoiceItemRecord[],
   ): Promise<boolean>;
   transition(
     userId: string,
@@ -99,6 +98,5 @@ export interface InvoiceRepository {
   cancelIssued(
     userId: string,
     id: string,
-    items: readonly InvoiceItemRecord[],
   ): Promise<boolean>;
 }

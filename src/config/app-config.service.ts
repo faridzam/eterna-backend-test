@@ -4,6 +4,8 @@ export interface AppConfiguration {
   readonly corsOrigins: readonly string[];
   readonly databaseUrl: string;
   readonly frontendOrigin: string;
+  readonly loginRateLimitMax: number;
+  readonly loginRateLimitWindowMs: number;
   readonly isProduction: boolean;
   readonly port: number;
   readonly sessionDurationMs: number;
@@ -76,6 +78,17 @@ export function createAppConfiguration(
     corsOrigins,
     databaseUrl,
     frontendOrigin,
+    loginRateLimitMax: positiveInteger(
+      environment.LOGIN_RATE_LIMIT_MAX,
+      5,
+      'LOGIN_RATE_LIMIT_MAX',
+    ),
+    loginRateLimitWindowMs:
+      positiveInteger(
+        environment.LOGIN_RATE_LIMIT_WINDOW_SECONDS,
+        60,
+        'LOGIN_RATE_LIMIT_WINDOW_SECONDS',
+      ) * 1000,
     isProduction,
     port: positiveInteger(environment.PORT, 8000, 'PORT'),
     sessionDurationMs:
@@ -110,6 +123,14 @@ export class AppConfigService {
 
   get frontendOrigin(): string {
     return this.configuration.frontendOrigin;
+  }
+
+  get loginRateLimitMax(): number {
+    return this.configuration.loginRateLimitMax;
+  }
+
+  get loginRateLimitWindowMs(): number {
+    return this.configuration.loginRateLimitWindowMs;
   }
 
   get isProduction(): boolean {

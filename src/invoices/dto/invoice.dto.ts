@@ -1,17 +1,18 @@
 import { InvoiceStatus } from '@prisma/client';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
-  ArrayMinSize,
-  IsArray,
-  IsDateString,
-  IsEnum,
-  IsInt,
-  IsOptional,
-  IsString,
-  Max,
-  MaxLength,
-  Min,
-  ValidateNested,
+    ArrayMinSize,
+    IsArray,
+    IsDateString,
+    IsEnum,
+    IsInt,
+    IsNotEmpty,
+    IsOptional,
+    IsString,
+    Max,
+    MaxLength,
+    Min,
+    ValidateNested,
 } from 'class-validator';
 
 export class InvoiceLineDto {
@@ -26,7 +27,11 @@ export class InvoiceLineDto {
 }
 
 export class CreateInvoiceDto {
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
+  @IsNotEmpty()
   @MaxLength(200)
   declare customerName: string;
 

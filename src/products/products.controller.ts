@@ -1,32 +1,34 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  Req,
-  UseGuards,
+    Body,
+    Controller,
+    Delete,
+    Get,
+    Param,
+    Patch,
+    Post,
+    Query,
+    Req,
+    UseGuards,
 } from '@nestjs/common';
 import {
-  ApiBadRequestResponse,
-  ApiConflictResponse,
-  ApiCreatedResponse,
-  ApiNotFoundResponse,
-  ApiOkResponse,
-  ApiOperation,
-  ApiTags,
-  ApiUnauthorizedResponse,
+    ApiBadRequestResponse,
+    ApiConflictResponse,
+    ApiCreatedResponse,
+    ApiNotFoundResponse,
+    ApiOkResponse,
+    ApiOperation,
+    ApiTags,
+    ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CsrfOriginGuard } from '../auth/csrf-origin.guard.js';
+import { Roles } from '../auth/roles.decorator.js';
+import { RolesGuard } from '../auth/roles.guard.js';
 import type { AuthenticatedRequest } from '../auth/session-auth.guard.js';
 import { SessionAuthGuard } from '../auth/session-auth.guard.js';
 import {
-  CreateProductDto,
-  ListProductsQueryDto,
-  UpdateProductDto,
+    CreateProductDto,
+    ListProductsQueryDto,
+    UpdateProductDto,
 } from './dto/product.dto.js';
 import { ProductsService } from './products.service.js';
 
@@ -117,6 +119,8 @@ export class ProductsController {
   })
   @ApiUnauthorizedResponse({ description: 'Authentication is required.' })
   @UseGuards(CsrfOriginGuard)
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
   async delete(@Req() request: AuthenticatedRequest, @Param('id') id: string) {
     await this.products.delete(authenticatedUserId(request), id);
     return { message: 'Product deleted successfully.', data: null };

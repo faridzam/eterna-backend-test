@@ -16,6 +16,7 @@ import { CsrfOriginGuard } from './csrf-origin.guard.js';
 import { LoginDto } from './dto/login.dto.js';
 import { RegisterResponseDto } from './dto/register-response.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
+import { LoginRateLimitGuard } from './login-rate-limit.guard.js';
 import type { AuthenticatedRequest } from './session-auth.guard.js';
 import { SessionAuthGuard } from './session-auth.guard.js';
 import {
@@ -51,6 +52,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(200)
+  @UseGuards(LoginRateLimitGuard)
   async login(
     @Body() input: LoginDto,
     @Req() request: Request,
@@ -65,22 +67,28 @@ export class AuthController {
       result.rawToken,
       sessionCookieOptions(this.config, result.expiresAt),
     );
-    return { data: { user: result.user } };
+    return {
+      message: 'Signed in successfully.',
+      data: { user: result.user },
+    };
   }
 
   @Get('me')
   @UseGuards(SessionAuthGuard)
   me(@Req() request: AuthenticatedRequest) {
-    return { data: request.authenticatedUser };
+    return {
+      message: 'Authenticated user retrieved successfully.',
+      data: request.authenticatedUser,
+    };
   }
 
   @Post('logout')
-  @HttpCode(204)
+  @HttpCode(200)
   @UseGuards(CsrfOriginGuard)
   async logout(
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
-  ): Promise<void> {
+  ) {
     const cookies: unknown = request.cookies;
     const value: unknown =
       typeof cookies === 'object' && cookies !== null
@@ -93,5 +101,6 @@ export class AuthController {
       SESSION_COOKIE_NAME,
       clearSessionCookieOptions(this.config),
     );
+    return { message: 'Signed out successfully.', data: null };
   }
 }

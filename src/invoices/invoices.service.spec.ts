@@ -1,21 +1,20 @@
 import {
-  BadRequestException,
-  ConflictException,
-  NotFoundException,
+    BadRequestException,
+    ConflictException,
+    NotFoundException,
 } from '@nestjs/common';
 import { InvoiceStatus } from '@prisma/client';
 import { describe, expect, it } from 'vitest';
 import { AppConfigService } from '../config/app-config.service.js';
 import {
-  ProductRecord,
-  ProductRepository,
+    ProductRecord,
+    ProductRepository,
 } from '../products/domain/product.types.js';
 import {
-  CreateInvoiceRecord,
-  InvoiceItemRecord,
-  InvoicePage,
-  InvoiceRecord,
-  InvoiceRepository,
+    CreateInvoiceRecord,
+    InvoicePage,
+    InvoiceRecord,
+    InvoiceRepository,
 } from './domain/invoice.types.js';
 import { InvoicesService } from './invoices.service.js';
 
@@ -93,7 +92,7 @@ function createHarness() {
         ? { items: [], total: 0 }
         : { items: [invoice], total: 1 };
     },
-    async issue(userId, id, items: readonly InvoiceItemRecord[]) {
+    async issue(userId, id) {
       if (
         invoice === null ||
         invoice.userId !== userId ||
@@ -102,7 +101,10 @@ function createHarness() {
       ) {
         return false;
       }
-      const quantity = items.reduce((total, item) => total + item.quantity, 0);
+      const quantity = invoice.items.reduce(
+        (total, item) => total + item.quantity,
+        0,
+      );
       if (product.quantityOnHand < quantity) {
         return false;
       }
@@ -125,7 +127,7 @@ function createHarness() {
       invoice = { ...invoice, status: to };
       return true;
     },
-    async cancelIssued(userId, id, items: readonly InvoiceItemRecord[]) {
+    async cancelIssued(userId, id) {
       if (
         invoice === null ||
         invoice.userId !== userId ||
@@ -138,7 +140,7 @@ function createHarness() {
         ...product,
         quantityOnHand:
           product.quantityOnHand +
-          items.reduce((total, item) => total + item.quantity, 0),
+          invoice.items.reduce((total, item) => total + item.quantity, 0),
       };
       invoice = { ...invoice, status: InvoiceStatus.CANCELLED };
       return true;

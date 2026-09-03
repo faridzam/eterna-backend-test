@@ -1,9 +1,9 @@
 import {
-  BadRequestException,
-  ConflictException,
-  Inject,
-  Injectable,
-  NotFoundException,
+    BadRequestException,
+    ConflictException,
+    Inject,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { InvoiceStatus } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
@@ -12,19 +12,19 @@ import { AppConfigService } from '../config/app-config.service.js';
 import type { ProductRepository } from '../products/domain/product.types.js';
 import { PRODUCT_REPOSITORY } from '../products/domain/product.types.js';
 import type {
-  InvoiceRecord,
-  InvoiceRepository,
+    InvoiceRecord,
+    InvoiceRepository,
 } from './domain/invoice.types.js';
 import {
-  INVOICE_REPOSITORY,
-  InsufficientStockError,
-  TransactionConflictError,
-  type UpdateDraftInvoiceRecord,
+    INVOICE_REPOSITORY,
+    InsufficientStockError,
+    TransactionConflictError,
+    type UpdateDraftInvoiceRecord,
 } from './domain/invoice.types.js';
 import {
-  CreateInvoiceDto,
-  ListInvoicesQueryDto,
-  UpdateInvoiceDto,
+    CreateInvoiceDto,
+    ListInvoicesQueryDto,
+    UpdateInvoiceDto,
 } from './dto/invoice.dto.js';
 
 @Injectable()
@@ -92,7 +92,7 @@ export class InvoicesService {
       status === InvoiceStatus.ISSUED
     ) {
       try {
-        if (await this.invoices.issue(userId, id, invoice.items)) {
+        if (await this.invoices.issue(userId, id)) {
           return this.requireInvoice(userId, id);
         }
       } catch (error: unknown) {
@@ -137,7 +137,7 @@ export class InvoicesService {
       status === InvoiceStatus.CANCELLED
     ) {
       try {
-        if (await this.invoices.cancelIssued(userId, id, invoice.items)) {
+        if (await this.invoices.cancelIssued(userId, id)) {
           return this.requireInvoice(userId, id);
         }
       } catch (error: unknown) {
