@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InvoiceStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service.js';
-import type { CreateInvoiceRecord, InvoiceItemRecord, InvoicePage, InvoiceRecord, InvoiceRepository } from '../domain/invoice.types.js';
-import { InsufficientStockError } from '../domain/invoice.types.js';
+import type { CreateInvoiceRecord, InvoiceItemRecord, InvoicePage, InvoiceRecord, InvoiceRepository, UpdateDraftInvoiceRecord } from '../domain/invoice.types.js';
+import { InsufficientStockError, TransactionConflictError } from '../domain/invoice.types.js';
 
 const invoiceWithItems = Prisma.validator<Prisma.InvoiceInclude>()({ items: true });
 
@@ -32,6 +32,25 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
     return this.prisma.invoice.findFirst({ where: { id, userId }, include: invoiceWithItems });
   }
 
+  async updateDraft(userId: string, id: string, input: UpdateDraftInvoiceRecord): Promise<boolean> {
+    try {
+      return await this.prisma.$transaction(async (transaction) => {
+        const updated = await transaction.invoice.updateMany({ where: { id, userId, status: InvoiceStatus.DRAFT }, data: { customerName: input.customerName, issueDate: input.issueDate, dueDate: input.dueDate, notes: input.notes, subtotalCents: input.subtotalCents, taxAmountCents: input.taxAmountCents, totalCents: input.totalCents } });
+        if (updated.count === 0) {
+          return false;
+        }
+        await transaction.invoiceItem.deleteMany({ where: { invoiceId: id } });
+        await transaction.invoiceItem.createMany({ data: input.items.map((item) => ({ invoiceId: id, ...item })) });
+        return true;
+      });
+    } catch (error: unknown) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
+        throw new TransactionConflictError();
+      }
+      throw error;
+    }
+  }
+
   async findMany(userId: string, status: InvoiceStatus | undefined, skip: number, take: number): Promise<InvoicePage> {
     const where = { userId, ...(status === undefined ? {} : { status }) };
     const [items, total] = await this.prisma.$transaction([
@@ -42,26 +61,22 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
   }
 
   async issue(userId: string, id: string, items: readonly InvoiceItemRecord[]): Promise<boolean> {
-    return this.prisma.$transaction(async (transaction) => {
-      const invoice = await transaction.invoice.updateMany({
-        where: { id, userId, status: InvoiceStatus.DRAFT },
-        data: { status: InvoiceStatus.ISSUED },
-      });
-      if (invoice.count === 0) {
-        return false;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(async (transaction) => {
+          const invoice = await transaction.invoice.updateMany({ where: { id, userId, status: InvoiceStatus.DRAFT }, data: { status: InvoiceStatus.ISSUED } });
+          if (invoice.count === 0) return false;
+          for (const item of items) {
+            const changed = await transaction.product.updateMany({ where: { id: item.productId, userId, quantityOnHand: { gte: item.quantity } }, data: { quantityOnHand: { decrement: item.quantity } } });
+            if (changed.count === 0) throw new InsufficientStockError(item.productName);
+          }
+          return true;
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      } catch (error: unknown) {
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2034' || attempt === 2) throw error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034' ? new TransactionConflictError() : error;
       }
-
-      for (const item of items) {
-        const changed = await transaction.product.updateMany({
-          where: { id: item.productId, userId, quantityOnHand: { gte: item.quantity } },
-          data: { quantityOnHand: { decrement: item.quantity } },
-        });
-        if (changed.count === 0) {
-          throw new InsufficientStockError(item.productName);
-        }
-      }
-      return true;
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    }
+    throw new TransactionConflictError();
   }
 
   async transition(userId: string, id: string, from: InvoiceStatus, to: InvoiceStatus): Promise<boolean> {
@@ -70,7 +85,8 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
   }
 
   async cancelIssued(userId: string, id: string, items: readonly InvoiceItemRecord[]): Promise<boolean> {
-    return this.prisma.$transaction(async (transaction) => {
+    try {
+      return await this.prisma.$transaction(async (transaction) => {
       const invoice = await transaction.invoice.updateMany({
         where: { id, userId, status: InvoiceStatus.ISSUED },
         data: { status: InvoiceStatus.CANCELLED },
@@ -85,6 +101,10 @@ export class PrismaInvoiceRepository implements InvoiceRepository {
         });
       }
       return true;
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    } catch (error: unknown) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') throw new TransactionConflictError();
+      throw error;
+    }
   }
 }

@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { InvoiceStatus } from '@prisma/client';
 import { describe, expect, it } from 'vitest';
 import { AppConfigService } from '../config/app-config.service.js';
@@ -26,6 +26,11 @@ function createHarness() {
         items: input.items.map((item, index) => ({ id: `item-${index + 1}`, invoiceId: 'invoice-1', ...item })),
       };
       return invoice;
+    },
+    async updateDraft(userId, id, input) {
+      if (invoice === null || invoice.userId !== userId || invoice.id !== id || invoice.status !== InvoiceStatus.DRAFT) return false;
+      invoice = { ...invoice, ...input, items: input.items.map((item, index) => ({ id: `item-${index + 1}`, invoiceId: id, ...item })) };
+      return true;
     },
     async findById(userId, id) { return invoice?.userId === userId && invoice.id === id ? invoice : null; },
     async findMany(): Promise<InvoicePage> { return invoice === null ? { items: [], total: 0 } : { items: [invoice], total: 1 }; },
@@ -60,6 +65,25 @@ describe('InvoicesService', () => {
     await expect(harness.service.create('user-1', { ...invoiceInput, items: [{ productId: 'product-1', quantity: 5 }] })).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('calculates integer-cent totals and ignores client totals', async () => {
+    const harness = createHarness();
+    const created = await harness.service.create('user-1', { ...invoiceInput, subtotalCents: 1, taxAmountCents: 1, totalCents: 1 });
+    expect(created.subtotalCents).toBe(1050);
+    expect(created.taxAmountCents).toBe(116);
+    expect(created.totalCents).toBe(1166);
+    expect(created.items[0]).toMatchObject({ productName: 'Packing tape', unitPriceCents: 350, lineTotalCents: 1050 });
+  });
+
+  it('replaces draft lines and recalculates snapshots and totals', async () => {
+    const harness = createHarness();
+    const created = await harness.service.create('user-1', invoiceInput);
+    const updated = await harness.service.updateDraft('user-1', created.id, { ...invoiceInput, customerName: 'Updated customer', items: [{ productId: 'product-1', quantity: 2 }] });
+    expect(updated.customerName).toBe('Updated customer');
+    expect(updated.subtotalCents).toBe(700);
+    expect(updated.items[0].quantity).toBe(2);
+    expect(updated.items[0].unitPriceCents).toBe(350);
+  });
+
   it('decrements stock when issuing and restores it when cancelling', async () => {
     const harness = createHarness();
     const created = await harness.service.create('user-1', invoiceInput);
@@ -76,5 +100,14 @@ describe('InvoicesService', () => {
     const harness = createHarness();
     const created = await harness.service.create('user-1', invoiceInput);
     await expect(harness.service.get('user-2', created.id)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('rejects edits to terminal invoices and invalid transitions', async () => {
+    const harness = createHarness();
+    const created = await harness.service.create('user-1', invoiceInput);
+    await harness.service.changeStatus('user-1', created.id, InvoiceStatus.ISSUED);
+    await harness.service.changeStatus('user-1', created.id, InvoiceStatus.PAID);
+    await expect(harness.service.updateDraft('user-1', created.id, invoiceInput)).rejects.toBeInstanceOf(ConflictException);
+    await expect(harness.service.changeStatus('user-1', created.id, InvoiceStatus.CANCELLED)).rejects.toBeInstanceOf(ConflictException);
   });
 });

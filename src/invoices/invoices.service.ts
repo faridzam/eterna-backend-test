@@ -5,9 +5,9 @@ import { paginationOffset } from '../common/pagination.js';
 import { AppConfigService } from '../config/app-config.service.js';
 import type { ProductRepository } from '../products/domain/product.types.js';
 import { PRODUCT_REPOSITORY } from '../products/domain/product.types.js';
-import type { CreateInvoiceRecord, InvoiceRecord, InvoiceRepository } from './domain/invoice.types.js';
-import { INVOICE_REPOSITORY, InsufficientStockError } from './domain/invoice.types.js';
-import { CreateInvoiceDto, ListInvoicesQueryDto } from './dto/invoice.dto.js';
+import type { InvoiceRecord, InvoiceRepository } from './domain/invoice.types.js';
+import { INVOICE_REPOSITORY, InsufficientStockError, TransactionConflictError, type UpdateDraftInvoiceRecord } from './domain/invoice.types.js';
+import { CreateInvoiceDto, ListInvoicesQueryDto, UpdateInvoiceDto } from './dto/invoice.dto.js';
 
 @Injectable()
 export class InvoicesService {
@@ -18,43 +18,20 @@ export class InvoicesService {
   ) {}
 
   async create(userId: string, input: CreateInvoiceDto): Promise<InvoiceRecord> {
-    this.validateLineItems(input);
-    const products = await Promise.all(input.items.map((item) => this.products.findById(userId, item.productId)));
-    if (products.some((product) => product === null)) {
-      throw new NotFoundException('One or more products were not found.');
-    }
+    const resolved = await this.resolveInvoice(userId, input);
+    return this.invoices.create({ ...resolved, userId, invoiceNumber: this.invoiceNumber() });
+  }
 
-    const items = input.items.map((item, index) => {
-      const product = products[index];
-      if (product === null || product === undefined) {
-        throw new NotFoundException('One or more products were not found.');
-      }
-      if (item.quantity > product.quantityOnHand) {
-        throw new BadRequestException(`Insufficient stock for ${product.name}.`);
-      }
-      return {
-        productId: product.id,
-        productName: product.name,
-        unitPriceCents: product.unitPriceCents,
-        quantity: item.quantity,
-        lineTotalCents: product.unitPriceCents * item.quantity,
-      };
-    });
-    const subtotalCents = items.reduce((total, item) => total + item.lineTotalCents, 0);
-    const taxAmountCents = Math.round((subtotalCents * this.config.taxRateBasisPoints) / 10000);
-    const invoice: CreateInvoiceRecord = {
-      userId,
-      invoiceNumber: `INV-${new Date().getUTCFullYear()}-${randomBytes(5).toString('hex').toUpperCase()}`,
-      customerName: input.customerName.trim(),
-      issueDate: new Date(input.issueDate),
-      dueDate: input.dueDate === undefined ? null : new Date(input.dueDate),
-      notes: input.notes?.trim() || null,
-      subtotalCents,
-      taxAmountCents,
-      totalCents: subtotalCents + taxAmountCents,
-      items,
-    };
-    return this.invoices.create(invoice);
+  async updateDraft(userId: string, id: string, input: UpdateInvoiceDto): Promise<InvoiceRecord> {
+    const existing = await this.requireInvoice(userId, id);
+    if (existing.status !== InvoiceStatus.DRAFT) {
+      throw new ConflictException('Only draft invoices can be edited.');
+    }
+    const updated = await this.invoices.updateDraft(userId, id, await this.resolveInvoice(userId, input));
+    if (!updated) {
+      throw new ConflictException('Only draft invoices can be edited.');
+    }
+    return this.requireInvoice(userId, id);
   }
 
   async list(userId: string, query: ListInvoicesQueryDto) {
@@ -77,6 +54,9 @@ export class InvoicesService {
         if (error instanceof InsufficientStockError) {
           throw new BadRequestException(error.message);
         }
+        if (error instanceof TransactionConflictError) {
+          throw new ConflictException(error.message);
+        }
         throw error;
       }
     } else if (invoice.status === InvoiceStatus.ISSUED && status === InvoiceStatus.PAID) {
@@ -88,8 +68,15 @@ export class InvoicesService {
         return this.requireInvoice(userId, id);
       }
     } else if (invoice.status === InvoiceStatus.ISSUED && status === InvoiceStatus.CANCELLED) {
-      if (await this.invoices.cancelIssued(userId, id, invoice.items)) {
-        return this.requireInvoice(userId, id);
+      try {
+        if (await this.invoices.cancelIssued(userId, id, invoice.items)) {
+          return this.requireInvoice(userId, id);
+        }
+      } catch (error: unknown) {
+        if (error instanceof TransactionConflictError) {
+          throw new ConflictException(error.message);
+        }
+        throw error;
       }
     }
     throw new ConflictException('This invoice status transition is not allowed.');
@@ -100,6 +87,32 @@ export class InvoicesService {
     if (uniqueProductIds.size !== input.items.length) {
       throw new BadRequestException('Each product may appear only once on an invoice.');
     }
+  }
+
+  private async resolveInvoice(userId: string, input: CreateInvoiceDto): Promise<UpdateDraftInvoiceRecord> {
+    this.validateLineItems(input);
+    const products = await Promise.all(input.items.map((item) => this.products.findById(userId, item.productId)));
+    const missingIndex = products.findIndex((product) => product === null);
+    if (missingIndex >= 0) {
+      throw new NotFoundException(`Product ${input.items[missingIndex].productId} was not found.`);
+    }
+    const items = input.items.map((item, index) => {
+      const product = products[index];
+      if (product === null || product === undefined) {
+        throw new NotFoundException(`Product ${item.productId} was not found.`);
+      }
+      if (item.quantity > product.quantityOnHand) {
+        throw new BadRequestException(`Insufficient stock for ${product.name}.`);
+      }
+      return { productId: product.id, productName: product.name, unitPriceCents: product.unitPriceCents, quantity: item.quantity, lineTotalCents: product.unitPriceCents * item.quantity };
+    });
+    const subtotalCents = items.reduce((total, item) => total + item.lineTotalCents, 0);
+    const taxAmountCents = Math.round((subtotalCents * this.config.taxRateBasisPoints) / 10000);
+    return { customerName: input.customerName.trim(), issueDate: new Date(input.issueDate), dueDate: input.dueDate === undefined ? null : new Date(input.dueDate), notes: input.notes?.trim() || null, subtotalCents, taxAmountCents, totalCents: subtotalCents + taxAmountCents, items };
+  }
+
+  private invoiceNumber(): string {
+    return `INV-${new Date().getUTCFullYear()}-${randomBytes(5).toString('hex').toUpperCase()}`;
   }
 
   private async requireInvoice(userId: string, id: string): Promise<InvoiceRecord> {

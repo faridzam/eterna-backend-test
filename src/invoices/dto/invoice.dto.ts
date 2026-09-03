@@ -37,6 +37,8 @@ export class CreateInvoiceDto {
   declare items: InvoiceLineDto[];
 }
 
+export class UpdateInvoiceDto extends CreateInvoiceDto {}
+
 export class ListInvoicesQueryDto {
   @IsOptional()
   @IsEnum(InvoiceStatus)
