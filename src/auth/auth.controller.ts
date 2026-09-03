@@ -1,28 +1,43 @@
 import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  Post,
-  Req,
-  Res,
-  UseGuards,
+    Body,
+    Controller,
+    Get,
+    HttpCode,
+    Post,
+    Req,
+    Res,
+    UseGuards,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiResponse } from '@nestjs/swagger';
+import {
+    ApiBadRequestResponse,
+    ApiCookieAuth,
+    ApiCreatedResponse,
+    ApiOkResponse,
+    ApiOperation,
+    ApiResponse,
+    ApiTags,
+    ApiTooManyRequestsResponse,
+    ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { AppConfigService } from '../config/app-config.service.js';
 import { AuthService } from './auth.service.js';
 import { CsrfOriginGuard } from './csrf-origin.guard.js';
 import { LoginDto } from './dto/login.dto.js';
-import { RegisterResponseDto } from './dto/register-response.dto.js';
+import {
+    LoginResponseDto,
+    LogoutResponseDto,
+    MeResponseDto,
+    RegisterResponseDto,
+} from './dto/register-response.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginRateLimitGuard } from './login-rate-limit.guard.js';
 import type { AuthenticatedRequest } from './session-auth.guard.js';
 import { SessionAuthGuard } from './session-auth.guard.js';
 import {
-  clearSessionCookieOptions,
-  SESSION_COOKIE_NAME,
-  sessionCookieOptions,
+    clearSessionCookieOptions,
+    SESSION_COOKIE_NAME,
+    sessionCookieOptions,
 } from './session-cookie.js';
 
 function optionalHeader(request: Request, name: string): string | undefined {
@@ -33,6 +48,7 @@ function optionalHeader(request: Request, name: string): string | undefined {
 }
 
 @Controller('auth')
+@ApiTags('auth')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
@@ -40,8 +56,9 @@ export class AuthController {
   ) {}
 
   @Post('register')
+  @ApiOperation({ summary: 'Create an account' })
   @ApiCreatedResponse({ type: RegisterResponseDto })
-  @ApiResponse({ status: 400, description: 'Invalid registration input.' })
+  @ApiBadRequestResponse({ description: 'Invalid registration input.' })
   @ApiResponse({
     status: 409,
     description: 'An account already exists for that email address.',
@@ -52,6 +69,11 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(200)
+  @ApiOperation({ summary: 'Sign in and create a session' })
+  @ApiOkResponse({ type: LoginResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid login input.' })
+  @ApiUnauthorizedResponse({ description: 'Invalid email or password.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many login attempts.' })
   @UseGuards(LoginRateLimitGuard)
   async login(
     @Body() input: LoginDto,
@@ -74,6 +96,10 @@ export class AuthController {
   }
 
   @Get('me')
+  @ApiOperation({ summary: 'Read the authenticated user' })
+  @ApiCookieAuth('stockflow_session')
+  @ApiOkResponse({ type: MeResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Authentication is required.' })
   @UseGuards(SessionAuthGuard)
   me(@Req() request: AuthenticatedRequest) {
     return {
@@ -84,6 +110,11 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(200)
+  @ApiOperation({ summary: 'Sign out and revoke the current session' })
+  @ApiCookieAuth('stockflow_session')
+  @ApiOkResponse({ type: LogoutResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Authentication is required.' })
+  @ApiResponse({ status: 403, description: 'Request origin is not trusted.' })
   @UseGuards(CsrfOriginGuard)
   async logout(
     @Req() request: Request,

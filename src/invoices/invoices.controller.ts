@@ -1,34 +1,43 @@
 import {
-  BadRequestException,
-  Body,
-  Controller,
-  Get,
-  Headers,
-  Param,
-  Patch,
-  Post,
-  Query,
-  Req,
-  UseGuards,
+    BadRequestException,
+    Body,
+    Controller,
+    Get,
+    Headers,
+    Param,
+    Patch,
+    Post,
+    Query,
+    Req,
+    UseGuards,
 } from '@nestjs/common';
 import {
-  ApiBadRequestResponse,
-  ApiConflictResponse,
-  ApiCreatedResponse,
-  ApiNotFoundResponse,
-  ApiOkResponse,
-  ApiOperation,
-  ApiTags,
-  ApiUnauthorizedResponse,
+    ApiBadRequestResponse,
+    ApiBody,
+    ApiConflictResponse,
+    ApiCookieAuth,
+    ApiCreatedResponse,
+    ApiForbiddenResponse,
+    ApiHeader,
+    ApiNotFoundResponse,
+    ApiOkResponse,
+    ApiOperation,
+    ApiParam,
+    ApiQuery,
+    ApiTags,
+    ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { InvoiceStatus } from '@prisma/client';
 import { CsrfOriginGuard } from '../auth/csrf-origin.guard.js';
 import type { AuthenticatedRequest } from '../auth/session-auth.guard.js';
 import { SessionAuthGuard } from '../auth/session-auth.guard.js';
 import {
-  CreateInvoiceDto,
-  InvoiceStatusDto,
-  ListInvoicesQueryDto,
-  UpdateInvoiceDto,
+    CreateInvoiceDto,
+    InvoiceEnvelopeDto,
+    InvoicePageEnvelopeDto,
+    InvoiceStatusDto,
+    ListInvoicesQueryDto,
+    UpdateInvoiceDto,
 } from './dto/invoice.dto.js';
 import { InvoicesService } from './invoices.service.js';
 
@@ -64,18 +73,21 @@ function expectedVersion(value: string | string[] | undefined): number {
 
 @Controller('invoices')
 @ApiTags('invoices')
+@ApiCookieAuth('stockflow_session')
 @UseGuards(SessionAuthGuard)
 export class InvoicesController {
   constructor(private readonly invoices: InvoicesService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a draft invoice' })
-  @ApiCreatedResponse({ description: 'Invoice created successfully.' })
+  @ApiBody({ type: CreateInvoiceDto })
+  @ApiCreatedResponse({ description: 'Invoice created successfully.', type: InvoiceEnvelopeDto })
   @ApiBadRequestResponse({
     description: 'Invalid invoice fields or insufficient stock.',
   })
   @ApiNotFoundResponse({ description: 'Referenced product was not found.' })
   @ApiUnauthorizedResponse({ description: 'Authentication is required.' })
+  @ApiForbiddenResponse({ description: 'Request origin is not trusted.' })
   @UseGuards(CsrfOriginGuard)
   async create(
     @Req() request: AuthenticatedRequest,
@@ -89,7 +101,10 @@ export class InvoicesController {
 
   @Get()
   @ApiOperation({ summary: 'List owned invoices' })
-  @ApiOkResponse({ description: 'Invoices retrieved successfully.' })
+  @ApiQuery({ name: 'status', required: false, enum: Object.values(InvoiceStatus) })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'pageSize', required: false, type: Number, example: 20 })
+  @ApiOkResponse({ description: 'Invoices retrieved successfully.', type: InvoicePageEnvelopeDto })
   @ApiNotFoundResponse({ description: 'No invoices match the filter.' })
   @ApiUnauthorizedResponse({ description: 'Authentication is required.' })
   async list(
@@ -104,7 +119,8 @@ export class InvoicesController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Read an owned invoice' })
-  @ApiOkResponse({ description: 'Invoice retrieved successfully.' })
+  @ApiParam({ name: 'id', example: 'invoice-1' })
+  @ApiOkResponse({ description: 'Invoice retrieved successfully.', type: InvoiceEnvelopeDto })
   @ApiNotFoundResponse({ description: 'Invoice not found.' })
   @ApiUnauthorizedResponse({ description: 'Authentication is required.' })
   async get(@Req() request: AuthenticatedRequest, @Param('id') id: string) {
@@ -116,12 +132,18 @@ export class InvoicesController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Edit a draft invoice' })
-  @ApiOkResponse({ description: 'Invoice updated successfully.' })
+  @ApiParam({ name: 'id', example: 'invoice-1' })
+  @ApiHeader({ name: 'If-Match', description: 'Expected invoice version.', example: '1' })
+  @ApiHeader({ name: 'Idempotency-Key', description: 'Unique key for retry-safe mutation.', example: 'invoice-update-1' })
+  @ApiBody({ type: UpdateInvoiceDto })
+  @ApiOkResponse({ description: 'Invoice updated successfully.', type: InvoiceEnvelopeDto })
   @ApiConflictResponse({ description: 'Only draft invoices can be edited.' })
   @ApiNotFoundResponse({
     description: 'Invoice or referenced product was not found.',
   })
+  @ApiBadRequestResponse({ description: 'Invalid invoice fields or required headers.' })
   @ApiUnauthorizedResponse({ description: 'Authentication is required.' })
+  @ApiForbiddenResponse({ description: 'Request origin is not trusted.' })
   @UseGuards(CsrfOriginGuard)
   async update(
     @Req() request: AuthenticatedRequest,
@@ -145,15 +167,21 @@ export class InvoicesController {
 
   @Patch(':id/status')
   @ApiOperation({ summary: 'Change invoice status' })
-  @ApiOkResponse({ description: 'Invoice status updated successfully.' })
+  @ApiParam({ name: 'id', example: 'invoice-1' })
+  @ApiHeader({ name: 'If-Match', description: 'Expected invoice version.', example: '1' })
+  @ApiHeader({ name: 'Idempotency-Key', description: 'Unique key for retry-safe mutation.', example: 'invoice-status-1' })
+  @ApiBody({ type: InvoiceStatusDto })
+  @ApiOkResponse({ description: 'Invoice status updated successfully.', type: InvoiceEnvelopeDto })
   @ApiBadRequestResponse({
-    description: 'Insufficient stock to issue the invoice.',
+    description:
+      'Invalid status or required headers, or insufficient stock to issue the invoice.',
   })
   @ApiConflictResponse({
     description: 'The status transition is not allowed or conflicted.',
   })
   @ApiNotFoundResponse({ description: 'Invoice not found.' })
   @ApiUnauthorizedResponse({ description: 'Authentication is required.' })
+  @ApiForbiddenResponse({ description: 'Request origin is not trusted.' })
   @UseGuards(CsrfOriginGuard)
   async changeStatus(
     @Req() request: AuthenticatedRequest,

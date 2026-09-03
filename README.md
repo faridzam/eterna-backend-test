@@ -2,19 +2,21 @@
 
 ## Setup and run
 
-From a fresh machine with Node.js 24+, npm, and Docker Desktop installed:
+From a fresh machine with Node.js 24+, npm, and PostgreSQL running locally:
 
 ```bash
 cd eterna-backend-test
 npm install
 cp .env.example .env
-docker compose up --build
-docker compose run --rm migrate npm run db:seed
+npm run prisma:generate
+npx prisma migrate deploy
+npm run db:seed
+npm run start:dev
 ```
 
-The API runs at `http://localhost:8000`; Swagger is at `http://localhost:8000/api-docs`. Set a unique `SESSION_TOKEN_PEPPER` in `.env`. Run `docker compose down` to stop the services. Without Docker, provide PostgreSQL through `DATABASE_URL`, then run `npm run prisma:generate`, `npx prisma migrate deploy`, and `npm run db:seed`.
+The API runs at `http://localhost:8000`; Swagger is at `http://localhost:8000/api-docs`. Set `DATABASE_URL` to your local PostgreSQL database and use a unique `SESSION_TOKEN_PEPPER` in `.env`. For a production build, run `npm run build` followed by `npm run start:prod`.
 
-Compose reads `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `SESSION_TOKEN_PEPPER`, and API settings from `.env`; it derives the container database URL so a local `DATABASE_URL` does not point the API container at `localhost`. The default CORS origin is `http://localhost:3000` for the web app.
+The default CORS origin is `http://localhost:3000` for the web app.
 
 Useful checks:
 
@@ -45,7 +47,7 @@ npm run build
 ## Trade-offs and known limitations
 
 - Session metadata and the process-local login rate limiter are not backed by Redis, so horizontal scaling would need additional infrastructure.
-- The frontend is not included in the Docker Compose stack and must be started separately.
+- The frontend is a separate application and must be started separately.
 - Integration tests require a separately provisioned disposable PostgreSQL database.
 - RBAC is currently limited to `ADMIN` and `STAFF` roles on the user record rather than configurable permissions.
 - There is no production deployment, monitoring, alerting, or centralized audit-log service.
@@ -58,6 +60,7 @@ npm run build
 - Add structured logs, metrics, tracing, and an administrator-facing audit history.
 - Expand concurrency and failure testing around invoice issuance, cancellation, and retries.
 - Add deployment automation, secrets management, backups, and a production readiness checklist.
+- Add API versioning for major changes
 
 ## AI Usage
 

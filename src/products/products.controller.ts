@@ -12,16 +12,19 @@ import {
 } from '@nestjs/common';
 import {
     ApiBadRequestResponse,
+    ApiBody,
     ApiConflictResponse,
+    ApiCookieAuth,
     ApiCreatedResponse,
     ApiExtraModels,
     ApiForbiddenResponse,
     ApiNotFoundResponse,
     ApiOkResponse,
     ApiOperation,
+    ApiParam,
+    ApiQuery,
     ApiTags,
     ApiUnauthorizedResponse,
-    getSchemaPath,
 } from '@nestjs/swagger';
 import { CsrfOriginGuard } from '../auth/csrf-origin.guard.js';
 import { Roles } from '../auth/roles.decorator.js';
@@ -31,7 +34,10 @@ import { SessionAuthGuard } from '../auth/session-auth.guard.js';
 import {
     CreateProductDto,
     ListProductsQueryDto,
+    ProductEnvelopeDto,
+    ProductMessageEnvelopeDto,
     ProductOwnerResponseDto,
+    ProductPageEnvelopeDto,
     UpdateProductDto,
 } from './dto/product.dto.js';
 import { ProductsService } from './products.service.js';
@@ -52,6 +58,7 @@ function authenticatedUser(request: AuthenticatedRequest) {
 
 @Controller('products')
 @ApiTags('products')
+@ApiCookieAuth('stockflow_session')
 @ApiExtraModels(ProductOwnerResponseDto)
 @UseGuards(SessionAuthGuard)
 export class ProductsController {
@@ -59,12 +66,14 @@ export class ProductsController {
 
   @Post()
   @ApiOperation({ summary: 'Create an active product' })
-  @ApiCreatedResponse({ description: 'Product created successfully.' })
+  @ApiBody({ type: CreateProductDto })
+  @ApiCreatedResponse({ description: 'Product created successfully.', type: ProductEnvelopeDto })
   @ApiBadRequestResponse({ description: 'Invalid product fields.' })
   @ApiConflictResponse({
     description: 'An active product already uses the SKU.',
   })
   @ApiUnauthorizedResponse({ description: 'Authentication is required.' })
+  @ApiForbiddenResponse({ description: 'Request origin is not trusted.' })
   @UseGuards(CsrfOriginGuard)
   async create(
     @Req() request: AuthenticatedRequest,
@@ -78,29 +87,10 @@ export class ProductsController {
 
   @Get()
   @ApiOperation({ summary: 'List active products' })
-  @ApiOkResponse({
-    description:
-      'Products retrieved successfully. Admin items include a sanitized owner with id, name, and email.',
-    schema: {
-      properties: {
-        data: {
-          properties: {
-            items: {
-              items: {
-                properties: {
-                  owner: { $ref: getSchemaPath(ProductOwnerResponseDto) },
-                },
-                type: 'object',
-              },
-              type: 'array',
-            },
-          },
-          type: 'object',
-        },
-      },
-      type: 'object',
-    },
-  })
+  @ApiQuery({ name: 'search', required: false, example: 'tape' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'pageSize', required: false, type: Number, example: 20 })
+  @ApiOkResponse({ description: 'Products retrieved successfully.', type: ProductPageEnvelopeDto })
   @ApiNotFoundResponse({ description: 'No products match the filter.' })
   @ApiUnauthorizedResponse({ description: 'Authentication is required.' })
   async list(
@@ -115,7 +105,8 @@ export class ProductsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Read an active product' })
-  @ApiOkResponse({ description: 'Product retrieved successfully.' })
+  @ApiParam({ name: 'id', example: 'product-1' })
+  @ApiOkResponse({ description: 'Product retrieved successfully.', type: ProductEnvelopeDto })
   @ApiNotFoundResponse({ description: 'Product not found.' })
   @ApiUnauthorizedResponse({ description: 'Authentication is required.' })
   async get(@Req() request: AuthenticatedRequest, @Param('id') id: string) {
@@ -127,13 +118,16 @@ export class ProductsController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update an active product' })
-  @ApiOkResponse({ description: 'Product updated successfully.' })
+  @ApiParam({ name: 'id', example: 'product-1' })
+  @ApiBody({ type: UpdateProductDto })
+  @ApiOkResponse({ description: 'Product updated successfully.', type: ProductEnvelopeDto })
   @ApiBadRequestResponse({ description: 'Invalid product fields.' })
   @ApiConflictResponse({
     description: 'An active product already uses the SKU.',
   })
   @ApiNotFoundResponse({ description: 'Product not found.' })
   @ApiUnauthorizedResponse({ description: 'Authentication is required.' })
+  @ApiForbiddenResponse({ description: 'Request origin is not trusted.' })
   @UseGuards(CsrfOriginGuard)
   async update(
     @Req() request: AuthenticatedRequest,
@@ -148,7 +142,8 @@ export class ProductsController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Soft delete an active product' })
-  @ApiOkResponse({ description: 'Product deleted successfully.' })
+  @ApiParam({ name: 'id', example: 'product-1' })
+  @ApiOkResponse({ description: 'Product deleted successfully.', type: ProductMessageEnvelopeDto })
   @ApiNotFoundResponse({
     description: 'Product not found, including already deleted products.',
   })
