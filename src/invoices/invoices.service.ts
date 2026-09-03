@@ -1,30 +1,33 @@
 import {
-  BadRequestException,
-  ConflictException,
-  Inject,
-  Injectable,
-  NotFoundException,
+    BadRequestException,
+    ConflictException,
+    Inject,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import { InvoiceStatus } from '@prisma/client';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { paginationOffset } from '../common/pagination.js';
 import { AppConfigService } from '../config/app-config.service.js';
 import type { ProductRepository } from '../products/domain/product.types.js';
 import { PRODUCT_REPOSITORY } from '../products/domain/product.types.js';
 import type {
-  InvoiceRecord,
-  InvoiceRepository,
+    InvoiceRecord,
+    InvoiceRepository,
 } from './domain/invoice.types.js';
 import {
-  INVOICE_REPOSITORY,
-  InsufficientStockError,
-  TransactionConflictError,
-  type UpdateDraftInvoiceRecord,
+    INVOICE_REPOSITORY,
+    IdempotencyConflictError,
+    IdempotencyProcessingError,
+    InsufficientStockError,
+    StaleInvoiceVersionError,
+    TransactionConflictError,
+    type UpdateDraftInvoiceRecord,
 } from './domain/invoice.types.js';
 import {
-  CreateInvoiceDto,
-  ListInvoicesQueryDto,
-  UpdateInvoiceDto,
+    CreateInvoiceDto,
+    ListInvoicesQueryDto,
+    UpdateInvoiceDto,
 } from './dto/invoice.dto.js';
 
 @Injectable()
@@ -50,21 +53,42 @@ export class InvoicesService {
   async updateDraft(
     userId: string,
     id: string,
+    expectedVersion: number,
+    idempotencyKey: string,
+    fingerprint: string,
     input: UpdateInvoiceDto,
   ): Promise<InvoiceRecord> {
+    const requestFingerprint = this.fingerprint(fingerprint);
+    const replay = await this.replay(
+      userId,
+      id,
+      'DRAFT_UPDATE',
+      idempotencyKey,
+      requestFingerprint,
+    );
+    if (replay) return replay;
     const existing = await this.requireInvoice(userId, id);
+    if (existing.version !== expectedVersion) {
+      throw new ConflictException(
+        'The invoice version is stale. Please reload and retry.',
+      );
+    }
     if (existing.status !== InvoiceStatus.DRAFT) {
       throw new ConflictException('Only draft invoices can be edited.');
     }
     const updated = await this.invoices.updateDraft(
       userId,
       id,
+      expectedVersion,
+      idempotencyKey,
+      requestFingerprint,
       await this.resolveInvoice(userId, input),
     );
     if (!updated) {
+      await this.requireInvoice(userId, id);
       throw new ConflictException('Only draft invoices can be edited.');
     }
-    return this.requireInvoice(userId, id);
+    return updated;
   }
 
   async list(userId: string, query: ListInvoicesQueryDto) {
@@ -85,21 +109,51 @@ export class InvoicesService {
     userId: string,
     id: string,
     status: InvoiceStatus,
+    expectedVersion: number,
+    idempotencyKey: string,
+    fingerprint: string,
   ): Promise<InvoiceRecord> {
+    const requestFingerprint = this.fingerprint(fingerprint);
+    const replay = await this.replay(
+      userId,
+      id,
+      'STATUS',
+      idempotencyKey,
+      requestFingerprint,
+    );
+    if (replay) return replay;
     const invoice = await this.requireInvoice(userId, id);
+    if (invoice.version !== expectedVersion) {
+      throw new ConflictException(
+        'The invoice version is stale. Please reload and retry.',
+      );
+    }
     if (
       invoice.status === InvoiceStatus.DRAFT &&
       status === InvoiceStatus.ISSUED
     ) {
       try {
-        if (await this.invoices.issue(userId, id)) {
-          return this.requireInvoice(userId, id);
+        const issued = await this.invoices.issue(
+          userId,
+          id,
+          expectedVersion,
+          idempotencyKey,
+          requestFingerprint,
+        );
+        if (issued) {
+          return issued;
         }
       } catch (error: unknown) {
         if (error instanceof InsufficientStockError) {
           throw new BadRequestException(error.message);
         }
-        if (error instanceof TransactionConflictError) {
+        if (
+          error instanceof TransactionConflictError ||
+          error instanceof StaleInvoiceVersionError
+        ) {
+          throw new ConflictException(error.message);
+        }
+        if (error instanceof IdempotencyConflictError || error instanceof IdempotencyProcessingError) {
           throw new ConflictException(error.message);
         }
         throw error;
@@ -108,44 +162,74 @@ export class InvoicesService {
       invoice.status === InvoiceStatus.ISSUED &&
       status === InvoiceStatus.PAID
     ) {
-      if (
-        await this.invoices.transition(
+      try {
+        const paid = await this.invoices.transition(
           userId,
           id,
           InvoiceStatus.ISSUED,
           InvoiceStatus.PAID,
-        )
-      ) {
-        return this.requireInvoice(userId, id);
+          expectedVersion,
+          idempotencyKey,
+          requestFingerprint,
+        );
+        if (paid) return paid;
+      } catch (error: unknown) {
+        if (error instanceof IdempotencyConflictError || error instanceof IdempotencyProcessingError) {
+          throw new ConflictException(error.message);
+        }
+        throw error;
       }
     } else if (
       invoice.status === InvoiceStatus.DRAFT &&
       status === InvoiceStatus.CANCELLED
     ) {
-      if (
-        await this.invoices.transition(
+      try {
+        const cancelledDraft = await this.invoices.transition(
           userId,
           id,
           InvoiceStatus.DRAFT,
           InvoiceStatus.CANCELLED,
-        )
-      ) {
-        return this.requireInvoice(userId, id);
+          expectedVersion,
+          idempotencyKey,
+          requestFingerprint,
+        );
+        if (cancelledDraft) return cancelledDraft;
+      } catch (error: unknown) {
+        if (error instanceof IdempotencyConflictError || error instanceof IdempotencyProcessingError) {
+          throw new ConflictException(error.message);
+        }
+        throw error;
       }
     } else if (
       invoice.status === InvoiceStatus.ISSUED &&
       status === InvoiceStatus.CANCELLED
     ) {
       try {
-        if (await this.invoices.cancelIssued(userId, id)) {
-          return this.requireInvoice(userId, id);
+        const cancelled = await this.invoices.cancelIssued(
+          userId,
+          id,
+          expectedVersion,
+          idempotencyKey,
+          requestFingerprint,
+        );
+        if (cancelled) {
+          return cancelled;
         }
       } catch (error: unknown) {
-        if (error instanceof TransactionConflictError) {
+        if (
+          error instanceof TransactionConflictError ||
+          error instanceof StaleInvoiceVersionError
+        ) {
           throw new ConflictException(error.message);
         }
         throw error;
       }
+    }
+    const current = await this.requireInvoice(userId, id);
+    if (current.version !== expectedVersion) {
+      throw new ConflictException(
+        'The invoice version is stale. Please reload and retry.',
+      );
     }
     throw new ConflictException(
       'This invoice status transition is not allowed.',
@@ -214,6 +298,36 @@ export class InvoicesService {
 
   private invoiceNumber(): string {
     return `INV-${new Date().getUTCFullYear()}-${randomBytes(5).toString('hex').toUpperCase()}`;
+  }
+
+  private fingerprint(input: string): string {
+    return createHash('sha256').update(input).digest('hex');
+  }
+
+  private async replay(
+    userId: string,
+    id: string,
+    operation: string,
+    key: string,
+    fingerprint: string,
+  ): Promise<InvoiceRecord | null> {
+    try {
+      return await this.invoices.findIdempotentResult(
+        userId,
+        id,
+        operation,
+        key,
+        fingerprint,
+      );
+    } catch (error: unknown) {
+      if (
+        error instanceof IdempotencyConflictError ||
+        error instanceof IdempotencyProcessingError
+      ) {
+        throw new ConflictException(error.message);
+      }
+      throw error;
+    }
   }
 
   private async requireInvoice(

@@ -18,6 +18,7 @@ export interface InvoiceRecord {
   readonly issueDate: Date;
   readonly dueDate: Date | null;
   readonly status: InvoiceStatus;
+  readonly version: number;
   readonly notes: string | null;
   readonly subtotalCents: number;
   readonly taxAmountCents: number;
@@ -69,6 +70,24 @@ export class TransactionConflictError extends Error {
   }
 }
 
+export class StaleInvoiceVersionError extends Error {
+  constructor() {
+    super('The invoice version is stale. Please reload and retry.');
+  }
+}
+
+export class IdempotencyConflictError extends Error {
+  constructor() {
+    super('This idempotency key was already used for a different request.');
+  }
+}
+
+export class IdempotencyProcessingError extends Error {
+  constructor() {
+    super('An equivalent request is already being processed. Please retry.');
+  }
+}
+
 export const INVOICE_REPOSITORY = Symbol('INVOICE_REPOSITORY');
 
 export interface InvoiceRepository {
@@ -76,8 +95,11 @@ export interface InvoiceRepository {
   updateDraft(
     userId: string,
     id: string,
+    expectedVersion: number,
+    idempotencyKey: string,
+    fingerprint: string,
     input: UpdateDraftInvoiceRecord,
-  ): Promise<boolean>;
+  ): Promise<InvoiceRecord | null>;
   findById(userId: string, id: string): Promise<InvoiceRecord | null>;
   findMany(
     userId: string,
@@ -85,12 +107,34 @@ export interface InvoiceRepository {
     skip: number,
     take: number,
   ): Promise<InvoicePage>;
-  issue(userId: string, id: string): Promise<boolean>;
+  findIdempotentResult(
+    userId: string,
+    id: string,
+    operation: string,
+    idempotencyKey: string,
+    fingerprint: string,
+  ): Promise<InvoiceRecord | null>;
+  issue(
+    userId: string,
+    id: string,
+    expectedVersion: number,
+    idempotencyKey: string,
+    fingerprint: string,
+  ): Promise<InvoiceRecord | null>;
   transition(
     userId: string,
     id: string,
     from: InvoiceStatus,
     to: InvoiceStatus,
-  ): Promise<boolean>;
-  cancelIssued(userId: string, id: string): Promise<boolean>;
+    expectedVersion: number,
+    idempotencyKey: string,
+    fingerprint: string,
+  ): Promise<InvoiceRecord | null>;
+  cancelIssued(
+    userId: string,
+    id: string,
+    expectedVersion: number,
+    idempotencyKey: string,
+    fingerprint: string,
+  ): Promise<InvoiceRecord | null>;
 }

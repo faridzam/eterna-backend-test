@@ -92,7 +92,8 @@ function harness(initial: ProductRecord[] = [makeProduct()]) {
           candidate.deletedAt === null,
       );
       if (row === undefined) return false;
-      row.deletedAt = new Date();
+      const index = rows.indexOf(row);
+      rows[index] = { ...row, deletedAt: new Date() };
       return true;
     },
   };

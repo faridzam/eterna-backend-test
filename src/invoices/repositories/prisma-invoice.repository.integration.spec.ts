@@ -1,5 +1,7 @@
-import { InvoiceStatus, PrismaClient } from '@prisma/client';
+import { InvoiceStatus } from '@prisma/client';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { PrismaService } from '../../database/prisma.service.js';
+import { IdempotencyConflictError } from '../domain/invoice.types.js';
 import { PrismaInvoiceRepository } from './prisma-invoice.repository.js';
 
 const databaseUrl = process.env.INTEGRATION_DATABASE_URL;
@@ -16,7 +18,7 @@ if (!testDatabaseName.endsWith('_test')) {
   );
 }
 
-const prisma = new PrismaClient({
+const prisma = new PrismaService({
   datasources: {
     db: {
       url: databaseUrl,
@@ -93,7 +95,15 @@ describe('Prisma invoice integration', () => {
       ],
     });
 
-    await expect(repository.issue(user.id, invoice.id)).resolves.toBe(true);
+    await expect(
+      repository.issue(
+        user.id,
+        invoice.id,
+        1,
+        'issue-1',
+        'issue-fingerprint',
+      ),
+    ).resolves.toMatchObject({ version: 2 });
     await expect(
       prisma.product.findUnique({ where: { id: first.id } }),
     ).resolves.toMatchObject({ quantityOnHand: 3 });
@@ -107,9 +117,33 @@ describe('Prisma invoice integration', () => {
       }),
     ).resolves.toHaveLength(2);
 
-    await expect(repository.cancelIssued(user.id, invoice.id)).resolves.toBe(
-      true,
-    );
+    await expect(
+      repository.issue(user.id, invoice.id, 1, 'issue-1', 'issue-fingerprint'),
+    ).resolves.toMatchObject({ status: InvoiceStatus.ISSUED, version: 2 });
+    await expect(
+      prisma.stockMovement.count({
+        where: { invoiceId: invoice.id, reason: 'INVOICE_ISSUED' },
+      }),
+    ).resolves.toBe(2);
+    await expect(
+      repository.issue(
+        user.id,
+        invoice.id,
+        1,
+        'issue-1',
+        'different-fingerprint',
+      ),
+    ).rejects.toBeInstanceOf(IdempotencyConflictError);
+
+    await expect(
+      repository.cancelIssued(
+        user.id,
+        invoice.id,
+        2,
+        'cancel-1',
+        'cancel-fingerprint',
+      ),
+    ).resolves.toMatchObject({ version: 3 });
     await expect(
       prisma.product.findUnique({ where: { id: first.id } }),
     ).resolves.toMatchObject({ quantityOnHand: 5 });
@@ -143,7 +177,13 @@ describe('Prisma invoice integration', () => {
       ],
     });
     await expect(
-      repository.issue(user.id, failingInvoice.id),
+      repository.issue(
+        user.id,
+        failingInvoice.id,
+        1,
+        'issue-failing',
+        'failing-fingerprint',
+      ),
     ).rejects.toThrow();
     await expect(
       prisma.invoice.findUnique({ where: { id: failingInvoice.id } }),
@@ -195,8 +235,20 @@ describe('Prisma invoice integration', () => {
     });
 
     const results = await Promise.allSettled([
-      repository.issue(user.id, invoice.id),
-      repository.issue(user.id, invoice.id),
+      repository.issue(
+        user.id,
+        invoice.id,
+        1,
+        'concurrent-issue-1',
+        'concurrent-fingerprint',
+      ),
+      repository.issue(
+        user.id,
+        invoice.id,
+        1,
+        'concurrent-issue-2',
+        'concurrent-fingerprint',
+      ),
     ]);
     expect(
       results.filter((result) => result.status === 'fulfilled' && result.value),

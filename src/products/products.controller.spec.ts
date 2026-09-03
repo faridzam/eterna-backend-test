@@ -1,15 +1,14 @@
 import {
-    ExecutionContext,
-    INestApplication,
-    NotFoundException,
+  ExecutionContext,
+  INestApplication,
+  NotFoundException,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { App } from 'supertest/types';
 import { afterEach, describe, it, vi } from 'vitest';
 import {
-    AuthenticatedRequest,
-    SessionAuthGuard,
+  AuthenticatedRequest,
+  SessionAuthGuard,
 } from '../auth/session-auth.guard.js';
 import { HttpExceptionFilter } from '../common/filters/http-exception.filter.js';
 import { AppConfigService } from '../config/app-config.service.js';
@@ -17,7 +16,7 @@ import { ProductsController } from './products.controller.js';
 import { ProductsService } from './products.service.js';
 
 describe('ProductsController', () => {
-  let app: INestApplication<App> | undefined;
+  let app: INestApplication | undefined;
   afterEach(async () => {
     await app?.close();
   });

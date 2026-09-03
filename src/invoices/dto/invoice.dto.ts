@@ -1,19 +1,21 @@
 import { InvoiceStatus } from '@prisma/client';
 import { Transform, Type } from 'class-transformer';
 import {
-  ArrayMinSize,
-  IsArray,
-  IsDateString,
-  IsEnum,
-  IsInt,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  Max,
-  MaxLength,
-  Min,
-  ValidateNested,
+    ArrayMinSize,
+    IsArray,
+    IsDateString,
+    IsEnum,
+    IsInt,
+    IsNotEmpty,
+    IsOptional,
+    IsString,
+    Max,
+    MaxLength,
+    Min,
+    ValidateNested,
 } from 'class-validator';
+
+export const INVOICE_MUTATION_KEY_MAX_LENGTH = 200;
 
 export class InvoiceLineDto {
   @IsString()

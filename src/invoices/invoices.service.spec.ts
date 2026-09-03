@@ -54,6 +54,7 @@ function createHarness() {
       invoice = {
         id: 'invoice-1',
         status: InvoiceStatus.DRAFT,
+        version: 1,
         createdAt: new Date(),
         updatedAt: new Date(),
         ...input,
@@ -65,24 +66,26 @@ function createHarness() {
       };
       return invoice;
     },
-    async updateDraft(userId, id, input) {
+    async updateDraft(userId, id, expectedVersion, _key, _fingerprint, input) {
       if (
         invoice === null ||
         invoice.userId !== userId ||
         invoice.id !== id ||
-        invoice.status !== InvoiceStatus.DRAFT
+        invoice.status !== InvoiceStatus.DRAFT ||
+        invoice.version !== expectedVersion
       )
-        return false;
+        return null;
       invoice = {
         ...invoice,
         ...input,
+        version: invoice.version + 1,
         items: input.items.map((item, index) => ({
           id: `item-${index + 1}`,
           invoiceId: id,
           ...item,
         })),
       };
-      return true;
+      return invoice;
     },
     async findById(userId, id) {
       return invoice?.userId === userId && invoice.id === id ? invoice : null;
@@ -92,49 +95,55 @@ function createHarness() {
         ? { items: [], total: 0 }
         : { items: [invoice], total: 1 };
     },
-    async issue(userId, id) {
+    async findIdempotentResult() {
+      return null;
+    },
+    async issue(userId, id, expectedVersion) {
       if (
         invoice === null ||
         invoice.userId !== userId ||
         invoice.id !== id ||
-        invoice.status !== InvoiceStatus.DRAFT
+        invoice.status !== InvoiceStatus.DRAFT ||
+        invoice.version !== expectedVersion
       ) {
-        return false;
+        return null;
       }
       const quantity = invoice.items.reduce(
         (total, item) => total + item.quantity,
         0,
       );
       if (product.quantityOnHand < quantity) {
-        return false;
+        return null;
       }
       product = {
         ...product,
         quantityOnHand: product.quantityOnHand - quantity,
       };
-      invoice = { ...invoice, status: InvoiceStatus.ISSUED };
-      return true;
+      invoice = { ...invoice, status: InvoiceStatus.ISSUED, version: invoice.version + 1 };
+      return invoice;
     },
-    async transition(userId, id, from, to) {
+    async transition(userId, id, from, to, expectedVersion) {
       if (
         invoice === null ||
         invoice.userId !== userId ||
         invoice.id !== id ||
-        invoice.status !== from
+        invoice.status !== from ||
+        invoice.version !== expectedVersion
       ) {
-        return false;
+        return null;
       }
-      invoice = { ...invoice, status: to };
-      return true;
+      invoice = { ...invoice, status: to, version: invoice.version + 1 };
+      return invoice;
     },
-    async cancelIssued(userId, id) {
+    async cancelIssued(userId, id, expectedVersion) {
       if (
         invoice === null ||
         invoice.userId !== userId ||
         invoice.id !== id ||
-        invoice.status !== InvoiceStatus.ISSUED
+        invoice.status !== InvoiceStatus.ISSUED ||
+        invoice.version !== expectedVersion
       ) {
-        return false;
+        return null;
       }
       product = {
         ...product,
@@ -142,8 +151,8 @@ function createHarness() {
           product.quantityOnHand +
           invoice.items.reduce((total, item) => total + item.quantity, 0),
       };
-      invoice = { ...invoice, status: InvoiceStatus.CANCELLED };
-      return true;
+      invoice = { ...invoice, status: InvoiceStatus.CANCELLED, version: invoice.version + 1 };
+      return invoice;
     },
   };
   return {
@@ -156,6 +165,13 @@ const invoiceInput = {
   customerName: 'Acme',
   issueDate: '2026-01-01',
   items: [{ productId: 'product-1', quantity: 3 }],
+};
+
+const invoiceInputWithClientTotals = {
+  ...invoiceInput,
+  subtotalCents: 1,
+  taxAmountCents: 1,
+  totalCents: 1,
 };
 
 describe('InvoicesService', () => {
@@ -172,10 +188,7 @@ describe('InvoicesService', () => {
   it('calculates integer-cent totals and ignores client totals', async () => {
     const harness = createHarness();
     const created = await harness.service.create('user-1', {
-      ...invoiceInput,
-      subtotalCents: 1,
-      taxAmountCents: 1,
-      totalCents: 1,
+      ...invoiceInputWithClientTotals,
     });
     expect(created.subtotalCents).toBe(1050);
     expect(created.taxAmountCents).toBe(116);
@@ -190,7 +203,7 @@ describe('InvoicesService', () => {
   it('replaces draft lines and recalculates snapshots and totals', async () => {
     const harness = createHarness();
     const created = await harness.service.create('user-1', invoiceInput);
-    const updated = await harness.service.updateDraft('user-1', created.id, {
+    const updated = await harness.service.updateDraft('user-1', created.id, 1, 'update-1', 'update', {
       ...invoiceInput,
       customerName: 'Updated customer',
       items: [{ productId: 'product-1', quantity: 2 }],
@@ -208,6 +221,9 @@ describe('InvoicesService', () => {
       'user-1',
       created.id,
       InvoiceStatus.ISSUED,
+      1,
+      'issue-1',
+      'issue',
     );
     expect(issued.status).toBe(InvoiceStatus.ISSUED);
     expect(harness.product().quantityOnHand).toBe(1);
@@ -216,6 +232,9 @@ describe('InvoicesService', () => {
       'user-1',
       created.id,
       InvoiceStatus.CANCELLED,
+      2,
+      'cancel-1',
+      'cancel',
     );
     expect(cancelled.status).toBe(InvoiceStatus.CANCELLED);
     expect(harness.product().quantityOnHand).toBe(4);
@@ -229,6 +248,21 @@ describe('InvoicesService', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it('rejects a stale invoice version', async () => {
+    const harness = createHarness();
+    const created = await harness.service.create('user-1', invoiceInput);
+    await expect(
+      harness.service.changeStatus(
+        'user-1',
+        created.id,
+        InvoiceStatus.ISSUED,
+        2,
+        'stale-issue',
+        'stale',
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+  });
+
   it('rejects edits to terminal invoices and invalid transitions', async () => {
     const harness = createHarness();
     const created = await harness.service.create('user-1', invoiceInput);
@@ -236,20 +270,29 @@ describe('InvoicesService', () => {
       'user-1',
       created.id,
       InvoiceStatus.ISSUED,
+      1,
+      'issue-1',
+      'issue',
     );
     await harness.service.changeStatus(
       'user-1',
       created.id,
       InvoiceStatus.PAID,
+      2,
+      'paid-1',
+      'paid',
     );
     await expect(
-      harness.service.updateDraft('user-1', created.id, invoiceInput),
+      harness.service.updateDraft('user-1', created.id, 3, 'update-2', 'update', invoiceInput),
     ).rejects.toBeInstanceOf(ConflictException);
     await expect(
       harness.service.changeStatus(
         'user-1',
         created.id,
         InvoiceStatus.CANCELLED,
+        3,
+        'cancel-2',
+        'cancel',
       ),
     ).rejects.toBeInstanceOf(ConflictException);
   });

@@ -6,9 +6,9 @@ import { AuthService } from './auth.service.js';
 import { DuplicateEmailError } from './domain/auth.errors.js';
 import { SessionRepository, UserRepository } from './domain/auth.repository.js';
 import {
-  SessionMetadata,
-  SessionRecord,
-  UserRecord,
+    SessionMetadata,
+    SessionRecord,
+    UserRecord,
 } from './domain/auth.types.js';
 import { SessionAuthGuard } from './session-auth.guard.js';
 import { SESSION_COOKIE_NAME } from './session-cookie.js';
@@ -22,6 +22,7 @@ function createHarness() {
       storedUser = {
         id: 'user-1',
         ...input,
+        role: input.role ?? 'STAFF',
         createdAt: new Date('2026-01-01T00:00:00.000Z'),
       };
       return storedUser;
@@ -65,7 +66,8 @@ function createHarness() {
           candidate.tokenHash === tokenHash && candidate.revokedAt === null,
       );
       if (session !== undefined) {
-        session.revokedAt = revokedAt;
+        const index = sessions.indexOf(session);
+        sessions[index] = { ...session, revokedAt };
       }
     },
   };

@@ -1,14 +1,13 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { App } from 'supertest/types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppConfigService } from '../config/app-config.service.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 
 describe('AuthController', () => {
-  let app: INestApplication<App> | undefined;
+  let app: INestApplication | undefined;
 
   afterEach(async () => {
     await app?.close();
@@ -39,11 +38,11 @@ describe('AuthController', () => {
       .post('/auth/login')
       .send({ email: 'ada@example.com', password: 'correct-password' })
       .expect(200);
-    expect(response.headers['set-cookie']?.join(';')).toContain(
+    expect(response.headers['set-cookie']?.toString()).toContain(
       'stockflow_session=raw-session-token',
     );
-    expect(response.headers['set-cookie']?.join(';')).toContain('HttpOnly');
-    expect(response.headers['set-cookie']?.join(';')).toContain('SameSite=Lax');
+    expect(response.headers['set-cookie']?.toString()).toContain('HttpOnly');
+    expect(response.headers['set-cookie']?.toString()).toContain('SameSite=Lax');
     expect(response.body).toEqual({
       message: 'Signed in successfully.',
       data: {

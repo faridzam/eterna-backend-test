@@ -37,6 +37,7 @@ model User {
   sessions     Session[]
   products     Product[]
   invoices     Invoice[]
+  invoiceIdempotency InvoiceIdempotency[]
   stockMovements StockMovement[]
 }
 
@@ -82,6 +83,7 @@ model Invoice {
   issueDate       DateTime
   dueDate         DateTime?
   status          InvoiceStatus @default(DRAFT)
+  version         Int            @default(1)
   notes           String?
   subtotalCents   Int
   taxAmountCents  Int
@@ -91,8 +93,28 @@ model Invoice {
   user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   items           InvoiceItem[]
   stockMovements  StockMovement[]
+  idempotencyRecords InvoiceIdempotency[]
 
   @@index([userId, status, createdAt])
+}
+
+model InvoiceIdempotency {
+  id             String   @id @default(uuid())
+  userId         String
+  operation      String
+  invoiceId      String
+  key            String
+  fingerprint    String
+  responseStatus Int
+  responseBody   Json?
+  createdAt      DateTime @default(now())
+  completedAt    DateTime?
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, operation, invoiceId, key])
+  @@unique([userId, key])
+  @@index([createdAt])
 }
 
 model InvoiceItem {

@@ -148,7 +148,7 @@ npm run start
 
 Successful endpoints return a non-empty backend-generated `message` and `data`. Errors consistently return `{ status, message, data: null }`. The API uses `400` for invalid input or insufficient stock, `401` for missing or invalid authentication, `403` for rejected origins or authorization, `404` for missing owned resources, `409` for conflicts and illegal transitions, and `500` for unexpected failures. Auth success responses include messages too; cookie authentication is unchanged.
 
-Products are soft-deleted so invoice references remain intact. Invoice lines snapshot product names and integer-cent prices. Issuing and cancelling issued invoices update stock transactionally with serializable isolation and conditional updates. The active-SKU uniqueness rule is a deliberate PostgreSQL partial unique index maintained by a migration; Prisma does not express partial indexes in `schema.prisma`.
+Products are soft-deleted so invoice references remain intact. Invoice lines snapshot product names and integer-cent prices. Issuing and cancelling issued invoices update stock transactionally with serializable isolation and conditional updates. Invoice mutations require `If-Match` with the current integer invoice `version` and an `Idempotency-Key` containing 1-200 non-whitespace characters. Keys are stored in PostgreSQL and scoped by user, operation, and invoice; equivalent completed retries replay safely, while a different fingerprint returns `409`. The active-SKU uniqueness rule is a deliberate PostgreSQL partial unique index maintained by a migration; Prisma does not express partial indexes in `schema.prisma`.
 
 ## Implemented bonuses
 
@@ -159,7 +159,38 @@ Products are soft-deleted so invoice references remain intact. Invoice lines sna
 - Invoice issue and cancellation use serializable transactions, conditional status/stock updates, and retries for transient serialization conflicts.
 - Invoice details include a print action. Print CSS hides application navigation and controls while preserving invoice data.
 
-Deployment and CI/CD are intentionally not included.
+Deployment is intentionally not included.
+
+## Continuous integration and merge protection
+
+The repository workflow at `.github/workflows/ci.yml` runs `backend-ci` on every
+branch push and on pull requests targeting `main`. It uses Node.js 24 and runs
+the same backend checks documented above:
+
+```bash
+npm ci
+npm run prisma:generate
+npx prisma migrate deploy
+npm run lint
+npm test
+npm run test:e2e
+npm run test:integration
+npm run build
+```
+
+CI uses an ephemeral PostgreSQL 16 service and safe test-only environment
+values. It does not require repository secrets, so pull requests from forks can
+run. The workflow does not contain production credentials or committed `.env`
+files.
+
+GitHub Actions reports the `backend-ci` result; it does not prevent merging by
+itself. To enforce it, open **Settings -> Rules -> Rulesets** (or **Settings ->
+Branches**), create a rule for the `main` branch, require pull requests before
+merging, require status checks to pass before merging, select `backend-ci`, and
+optionally require the branch to be up to date. Save the rule. Apply the same
+settings to the frontend repository and select its `frontend-ci` check there.
+Because these are separate repositories, each repository protects its own CI
+check.
 
 ## Tech choices and trade-offs
 

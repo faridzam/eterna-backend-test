@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  backend-ci:
+    name: backend-ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: stockflow_test
+          POSTGRES_USER: stockflow
+          POSTGRES_PASSWORD: stockflow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U stockflow -d stockflow_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: eterna-backend-test
+    env:
+      DATABASE_URL: postgresql://stockflow:stockflow@localhost:5432/stockflow_test?schema=public
+      INTEGRATION_DATABASE_URL: postgresql://stockflow:stockflow@localhost:5432/stockflow_test?schema=public
+      NODE_ENV: test
+      PORT: 8000
+      FRONTEND_ORIGIN: http://localhost:3000
+      CORS_ORIGINS: http://localhost:3000
+      SESSION_DURATION_HOURS: 168
+      SESSION_TOKEN_PEPPER: ci-only-session-pepper-not-for-production
+      LOGIN_RATE_LIMIT_MAX: 5
+      LOGIN_RATE_LIMIT_WINDOW_SECONDS: 60
+      TAX_RATE_BASIS_POINTS: 1100
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: eterna-backend-test/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Apply Prisma migrations
+        run: npx prisma migrate deploy
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: End-to-end tests
+        run: npm run test:e2e
+
+      - name: Integration tests
+        run: npm run test:integration
+
+      - name: Build
+        run: npm run build

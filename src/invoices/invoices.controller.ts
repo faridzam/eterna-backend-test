@@ -1,32 +1,34 @@
 import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  Req,
-  UseGuards,
+    BadRequestException,
+    Body,
+    Controller,
+    Get,
+    Headers,
+    Param,
+    Patch,
+    Post,
+    Query,
+    Req,
+    UseGuards,
 } from '@nestjs/common';
 import {
-  ApiBadRequestResponse,
-  ApiConflictResponse,
-  ApiCreatedResponse,
-  ApiNotFoundResponse,
-  ApiOkResponse,
-  ApiOperation,
-  ApiTags,
-  ApiUnauthorizedResponse,
+    ApiBadRequestResponse,
+    ApiConflictResponse,
+    ApiCreatedResponse,
+    ApiNotFoundResponse,
+    ApiOkResponse,
+    ApiOperation,
+    ApiTags,
+    ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CsrfOriginGuard } from '../auth/csrf-origin.guard.js';
 import type { AuthenticatedRequest } from '../auth/session-auth.guard.js';
 import { SessionAuthGuard } from '../auth/session-auth.guard.js';
 import {
-  CreateInvoiceDto,
-  InvoiceStatusDto,
-  ListInvoicesQueryDto,
-  UpdateInvoiceDto,
+    CreateInvoiceDto,
+    InvoiceStatusDto,
+    ListInvoicesQueryDto,
+    UpdateInvoiceDto,
 } from './dto/invoice.dto.js';
 import { InvoicesService } from './invoices.service.js';
 
@@ -35,6 +37,29 @@ function authenticatedUserId(request: AuthenticatedRequest): string {
     throw new Error('Authenticated request is missing a user.');
   }
   return request.authenticatedUser.id;
+}
+
+function requiredHeader(
+  value: string | string[] | undefined,
+  name: string,
+): string {
+  if (
+    typeof value !== 'string' ||
+    value.trim().length === 0 ||
+    value.length > 200
+  ) {
+    throw new BadRequestException(`${name} header is required.`);
+  }
+  return value.trim();
+}
+
+function expectedVersion(value: string | string[] | undefined): number {
+  const header = requiredHeader(value, 'If-Match');
+  const version = Number(header);
+  if (!Number.isSafeInteger(version) || version < 1) {
+    throw new BadRequestException('If-Match must be a positive integer version.');
+  }
+  return version;
 }
 
 @Controller('invoices')
@@ -101,12 +126,17 @@ export class InvoicesController {
     @Req() request: AuthenticatedRequest,
     @Param('id') id: string,
     @Body() input: UpdateInvoiceDto,
+    @Headers('if-match') ifMatch: string | string[] | undefined,
+    @Headers('idempotency-key') idempotencyKey: string | string[] | undefined,
   ) {
     return {
       message: 'Invoice updated successfully.',
       data: await this.invoices.updateDraft(
         authenticatedUserId(request),
         id,
+        expectedVersion(ifMatch),
+        requiredHeader(idempotencyKey, 'Idempotency-Key'),
+        JSON.stringify(input),
         input,
       ),
     };
@@ -128,6 +158,8 @@ export class InvoicesController {
     @Req() request: AuthenticatedRequest,
     @Param('id') id: string,
     @Body() input: InvoiceStatusDto,
+    @Headers('if-match') ifMatch: string | string[] | undefined,
+    @Headers('idempotency-key') idempotencyKey: string | string[] | undefined,
   ) {
     return {
       message: 'Invoice status updated successfully.',
@@ -135,6 +167,9 @@ export class InvoicesController {
         authenticatedUserId(request),
         id,
         input.status,
+        expectedVersion(ifMatch),
+        requiredHeader(idempotencyKey, 'Idempotency-Key'),
+        JSON.stringify(input),
       ),
     };
   }

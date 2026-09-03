@@ -2,7 +2,6 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
-import { App } from 'supertest/types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HttpExceptionFilter } from '../common/filters/http-exception.filter.js';
 import { AppConfigService } from '../config/app-config.service.js';
@@ -21,7 +20,7 @@ const user = {
 };
 
 describe('cookie-backed authentication', () => {
-  let app: INestApplication<App> | undefined;
+  let app: INestApplication | undefined;
 
   afterEach(async () => {
     await app?.close();
@@ -70,7 +69,7 @@ describe('cookie-backed authentication', () => {
       .post('/auth/login')
       .send({ email: user.email, password: 'correct-password' })
       .expect(200);
-    expect(login.headers['set-cookie']?.join(';')).toContain(
+    expect(login.headers['set-cookie']?.toString()).toContain(
       'stockflow_session=raw-session-token',
     );
 
