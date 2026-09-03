@@ -213,6 +213,90 @@ describe('ProductsService', () => {
       expect.arrayContaining(['sku', 'name']),
     );
   });
+  it('requires create fields and accepts zero numeric values', async () => {
+    const missingPrice = await validate(
+      plainToInstance(CreateProductDto, {
+        sku: 'SF-200',
+        name: 'Box',
+        quantityOnHand: 0,
+      }),
+    );
+    const missingQuantity = await validate(
+      plainToInstance(CreateProductDto, {
+        sku: 'SF-200',
+        name: 'Box',
+        unitPriceCents: 0,
+      }),
+    );
+    const nullValues = await validate(
+      plainToInstance(CreateProductDto, {
+        sku: 'SF-200',
+        name: 'Box',
+        unitPriceCents: null,
+        quantityOnHand: null,
+      }),
+    );
+    const missingText = await validate(
+      plainToInstance(CreateProductDto, {
+        unitPriceCents: 0,
+        quantityOnHand: 0,
+      }),
+    );
+    const valid = await validate(
+      plainToInstance(CreateProductDto, {
+        sku: 'SF-200',
+        name: 'Box',
+        unitPriceCents: 0,
+        quantityOnHand: 0,
+      }),
+    );
+
+    expect(missingPrice.map((error) => error.property)).toContain(
+      'unitPriceCents',
+    );
+    expect(missingQuantity.map((error) => error.property)).toContain(
+      'quantityOnHand',
+    );
+    expect(nullValues.map((error) => error.property)).toEqual(
+      expect.arrayContaining(['unitPriceCents', 'quantityOnHand']),
+    );
+    expect(missingText.map((error) => error.property)).toEqual(
+      expect.arrayContaining(['sku', 'name']),
+    );
+    expect(valid).toHaveLength(0);
+  });
+  it('rejects invalid numeric values and validates explicit null updates', async () => {
+    const invalidCreate = await validate(
+      plainToInstance(CreateProductDto, {
+        sku: 'SF-200',
+        name: 'Box',
+        unitPriceCents: -1.5,
+        quantityOnHand: 1.5,
+      }),
+    );
+    const nullUpdate = await validate(
+      plainToInstance(UpdateProductDto, {
+        unitPriceCents: null,
+        quantityOnHand: null,
+      }),
+    );
+    const zeroUpdate = await validate(
+      plainToInstance(UpdateProductDto, {
+        unitPriceCents: 0,
+        quantityOnHand: 0,
+      }),
+    );
+    const omittedUpdate = await validate(plainToInstance(UpdateProductDto, {}));
+
+    expect(invalidCreate.map((error) => error.property)).toEqual(
+      expect.arrayContaining(['unitPriceCents', 'quantityOnHand']),
+    );
+    expect(nullUpdate.map((error) => error.property)).toEqual(
+      expect.arrayContaining(['unitPriceCents', 'quantityOnHand']),
+    );
+    expect(zeroUpdate).toHaveLength(0);
+    expect(omittedUpdate).toHaveLength(0);
+  });
   it('lets admins list every active product with sanitized owners', async () => {
     const current = harness([
       makeProduct(),

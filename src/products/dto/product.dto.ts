@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
+    IsDefined,
     IsInt,
     IsNotEmpty,
     IsOptional,
@@ -8,6 +9,7 @@ import {
     Max,
     MaxLength,
     Min,
+    ValidateIf,
 } from 'class-validator';
 
 const trimString = ({ value }: { value: unknown }): unknown =>
@@ -107,14 +109,32 @@ export class CreateProductDto {
   description?: string;
 
   @ApiProperty({ example: 350, minimum: 0, maximum: 100000000 })
-  @Type(() => Number)
+  @IsDefined()
+  @Transform(({ value }) =>
+    value === null || value === undefined || value === ''
+      ? value
+      : typeof value === 'string'
+        ? value.trim() === ''
+          ? value
+          : Number(value)
+        : value,
+  )
   @IsInt()
   @Min(0)
   @Max(100000000)
   declare unitPriceCents: number;
 
   @ApiProperty({ example: 25, minimum: 0, maximum: 100000000 })
-  @Type(() => Number)
+  @IsDefined()
+  @Transform(({ value }) =>
+    value === null || value === undefined || value === ''
+      ? value
+      : typeof value === 'string'
+        ? value.trim() === ''
+          ? value
+          : Number(value)
+        : value,
+  )
   @IsInt()
   @Min(0)
   @Max(100000000)
@@ -123,7 +143,7 @@ export class CreateProductDto {
 
 export class UpdateProductDto {
   @ApiPropertyOptional({ example: 'SF-100', maxLength: 100 })
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @Transform(trimString)
   @IsString()
   @IsNotEmpty()
@@ -131,7 +151,7 @@ export class UpdateProductDto {
   sku?: string;
 
   @ApiPropertyOptional({ example: 'Packing tape', maxLength: 200 })
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @Transform(trimString)
   @IsString()
   @IsNotEmpty()
@@ -146,16 +166,32 @@ export class UpdateProductDto {
   description?: string;
 
   @ApiPropertyOptional({ example: 350, minimum: 0, maximum: 100000000 })
-  @IsOptional()
-  @Type(() => Number)
+  @ValidateIf((_, value) => value !== undefined)
+  @Transform(({ value }) =>
+    value === null || value === undefined || value === ''
+      ? value
+      : typeof value === 'string'
+        ? value.trim() === ''
+          ? value
+          : Number(value)
+        : value,
+  )
   @IsInt()
   @Min(0)
   @Max(100000000)
   unitPriceCents?: number;
 
   @ApiPropertyOptional({ example: 25, minimum: 0, maximum: 100000000 })
-  @IsOptional()
-  @Type(() => Number)
+  @ValidateIf((_, value) => value !== undefined)
+  @Transform(({ value }) =>
+    value === null || value === undefined || value === ''
+      ? value
+      : typeof value === 'string'
+        ? value.trim() === ''
+          ? value
+          : Number(value)
+        : value,
+  )
   @IsInt()
   @Min(0)
   @Max(100000000)
