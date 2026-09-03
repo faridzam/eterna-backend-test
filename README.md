@@ -5,6 +5,7 @@
 From a fresh machine with Node.js 24+, npm, and PostgreSQL running locally:
 
 ```bash
+git clone https://github.com/faridzam/eterna-backend-test.git
 cd eterna-backend-test
 npm install
 cp .env.example .env
