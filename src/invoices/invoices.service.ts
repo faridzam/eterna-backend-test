@@ -30,6 +30,8 @@ import {
   UpdateInvoiceDto,
 } from './dto/invoice.dto.js';
 
+const MAX_POSTGRES_INTEGER = 2_147_483_647;
+
 @Injectable()
 export class InvoicesService {
   constructor(
@@ -277,15 +279,19 @@ export class InvoicesService {
         productName: product.name,
         unitPriceCents: product.unitPriceCents,
         quantity: item.quantity,
-        lineTotalCents: product.unitPriceCents * item.quantity,
+        lineTotalCents: this.storableCents(
+          product.unitPriceCents * item.quantity,
+        ),
       };
     });
     const subtotalCents = items.reduce(
-      (total, item) => total + item.lineTotalCents,
+      (total, item) => this.storableCents(total + item.lineTotalCents),
       0,
     );
-    const taxAmountCents = Math.round(
-      (subtotalCents * this.config.taxRateBasisPoints) / 10000,
+    const taxAmountCents = this.storableCents(
+      Math.round(
+        (subtotalCents * this.config.taxRateBasisPoints) / 10_000,
+      ),
     );
     return {
       customerName: input.customerName.trim(),
@@ -294,9 +300,22 @@ export class InvoicesService {
       notes: input.notes?.trim() || null,
       subtotalCents,
       taxAmountCents,
-      totalCents: subtotalCents + taxAmountCents,
+      totalCents: this.storableCents(subtotalCents + taxAmountCents),
       items,
     };
+  }
+
+  private storableCents(value: number): number {
+    if (
+      !Number.isSafeInteger(value) ||
+      value < 0 ||
+      value > MAX_POSTGRES_INTEGER
+    ) {
+      throw new BadRequestException(
+        'Invoice amounts exceed the maximum supported integer-cent value.',
+      );
+    }
+    return value;
   }
 
   private invoiceNumber(): string {

@@ -48,6 +48,9 @@ export class ProductsService {
       paginationOffset(query.page, query.pageSize),
       query.pageSize,
     );
+    if (result.total === 0) {
+      throw new NotFoundException('No products found.');
+    }
     return { ...result, page: query.page, pageSize: query.pageSize };
   }
 

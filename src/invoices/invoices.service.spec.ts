@@ -19,7 +19,7 @@ import {
 import { ListInvoicesQueryDto } from './dto/invoice.dto.js';
 import { InvoicesService } from './invoices.service.js';
 
-function createHarness() {
+function createHarness(productOverrides: Partial<ProductRecord> = {}) {
   let product: ProductRecord = {
     id: 'product-1',
     userId: 'user-1',
@@ -31,6 +31,7 @@ function createHarness() {
     createdAt: new Date(),
     updatedAt: new Date(),
     deletedAt: null,
+    ...productOverrides,
   };
   let invoice: InvoiceRecord | null = null;
   const products: ProductRepository = {
@@ -199,6 +200,35 @@ describe('InvoicesService', () => {
       unitPriceCents: 350,
       lineTotalCents: 1050,
     });
+  });
+
+  it('accepts the highest invoice total within integer cents and rejects overflow', async () => {
+    const harness = createHarness({
+      unitPriceCents: 100_000_000,
+      quantityOnHand: 22,
+    });
+    await expect(
+      harness.service.create('user-1', {
+        ...invoiceInput,
+        items: [{ productId: 'product-1', quantity: 19 }],
+      }),
+    ).resolves.toMatchObject({
+      subtotalCents: 1_900_000_000,
+      taxAmountCents: 209_000_000,
+      totalCents: 2_109_000_000,
+    });
+    await expect(
+      harness.service.create('user-1', {
+        ...invoiceInput,
+        items: [{ productId: 'product-1', quantity: 20 }],
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      harness.service.create('user-1', {
+        ...invoiceInput,
+        items: [{ productId: 'product-1', quantity: 22 }],
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('replaces draft lines and recalculates snapshots and totals', async () => {

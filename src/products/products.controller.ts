@@ -101,6 +101,7 @@ export class ProductsController {
       type: 'object',
     },
   })
+  @ApiNotFoundResponse({ description: 'No products match the filter.' })
   @ApiUnauthorizedResponse({ description: 'Authentication is required.' })
   async list(
     @Req() request: AuthenticatedRequest,

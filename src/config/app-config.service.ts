@@ -30,6 +30,19 @@ function positiveInteger(
   return parsed;
 }
 
+function taxRateBasisPoints(value: string | undefined): number {
+  if (value === undefined) {
+    return 1100;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 0 || parsed > 10_000) {
+    throw new Error('TAX_RATE_BASIS_POINTS must be between 0 and 10000.');
+  }
+
+  return parsed;
+}
+
 export function createAppConfiguration(
   environment: NodeJS.ProcessEnv,
 ): AppConfiguration {
@@ -101,11 +114,7 @@ export function createAppConfiguration(
       60 *
       1000,
     sessionTokenPepper,
-    taxRateBasisPoints: positiveInteger(
-      environment.TAX_RATE_BASIS_POINTS,
-      1100,
-      'TAX_RATE_BASIS_POINTS',
-    ),
+    taxRateBasisPoints: taxRateBasisPoints(environment.TAX_RATE_BASIS_POINTS),
   };
 }
 

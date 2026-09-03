@@ -25,7 +25,7 @@ describe('ProductsController', () => {
     const products = {
       list: vi
         .fn()
-        .mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 10 }),
+        .mockRejectedValue(new NotFoundException('No products found.')),
       get: vi
         .fn()
         .mockRejectedValue(new NotFoundException('Product not found.')),
@@ -57,11 +57,8 @@ describe('ProductsController', () => {
     await app.init();
     await request(app.getHttpServer())
       .get('/products')
-      .expect(200)
-      .expect({
-        message: 'Products retrieved successfully.',
-        data: { items: [], total: 0, page: 1, pageSize: 10 },
-      });
+      .expect(404)
+      .expect({ status: 404, message: 'No products found.', data: null });
     await request(app.getHttpServer())
       .get('/products/product-1')
       .expect(404)

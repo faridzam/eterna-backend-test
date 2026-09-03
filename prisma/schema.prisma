@@ -73,6 +73,7 @@ model Product {
 
   @@index([userId, name])
   @@index([userId, deletedAt])
+  @@unique([userId, sku])
 }
 
 model Invoice {
@@ -147,4 +148,5 @@ model StockMovement {
   @@index([userId, createdAt])
   @@index([productId, createdAt])
   @@index([invoiceId])
+  @@unique([productId, reason])
 }

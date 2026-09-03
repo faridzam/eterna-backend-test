@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
+import { seedProducts } from './seed-products.js';
 
 const prisma = new PrismaClient();
 
@@ -30,8 +31,7 @@ async function seed(): Promise<void> {
       role: 'STAFF',
     },
   });
-  await prisma.product.createMany({
-    data: [
+  const products = [
       {
         userId: user.id,
         sku: 'SF-100',
@@ -64,9 +64,8 @@ async function seed(): Promise<void> {
         unitPriceCents: 850,
         quantityOnHand: 25,
       },
-    ],
-    skipDuplicates: true,
-  });
+    ];
+  await prisma.$transaction((transaction) => seedProducts(transaction, products));
 }
 
 seed()

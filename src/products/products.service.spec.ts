@@ -182,6 +182,11 @@ describe('ProductsService', () => {
       current.service.delete(admin, 'product-3'),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
+  it('returns not found when the product list is empty', async () => {
+    await expect(
+      harness([]).service.list(staff, { page: 1, pageSize: 10 }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
   it('preserves the row when soft deleting for invoice references', async () => {
     const current = harness();
     await current.service.delete(admin, 'product-1');
