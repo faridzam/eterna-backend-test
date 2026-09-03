@@ -18,15 +18,14 @@ interface SeedTransaction {
     }): Promise<{ readonly id: string }>;
   };
   readonly stockMovement: {
-    upsert(input: {
+    findFirst(input: {
       readonly where: {
-        readonly productId_reason: {
-          readonly productId: string;
-          readonly reason: StockMovementReason;
-        };
+        readonly productId: string;
+        readonly reason: StockMovementReason;
       };
-      readonly update: Record<string, never>;
-      readonly create: {
+    }): Promise<{ readonly id: string } | null>;
+    create(input: {
+      readonly data: {
         readonly productId: string;
         readonly userId: string;
         readonly quantityDelta: number;
@@ -46,20 +45,21 @@ export async function seedProducts(
       update: {},
       create: input,
     });
-    await transaction.stockMovement.upsert({
+    const initialStock = await transaction.stockMovement.findFirst({
       where: {
-        productId_reason: {
-          productId: product.id,
-          reason: StockMovementReason.INITIAL_STOCK,
-        },
-      },
-      update: {},
-      create: {
         productId: product.id,
-        userId: input.userId,
-        quantityDelta: input.quantityOnHand,
         reason: StockMovementReason.INITIAL_STOCK,
       },
     });
+    if (initialStock === null) {
+      await transaction.stockMovement.create({
+        data: {
+          productId: product.id,
+          userId: input.userId,
+          quantityDelta: input.quantityOnHand,
+          reason: StockMovementReason.INITIAL_STOCK,
+        },
+      });
+    }
   }
 }

@@ -62,6 +62,7 @@ npm run build
 - Expand concurrency and failure testing around invoice issuance, cancellation, and retries.
 - Add deployment automation, secrets management, backups, and a production readiness checklist.
 - Add API versioning for major changes
+- Send tax rate data from backend to frontend. It should be configurable on frontend as well.
 
 ## AI Usage
 

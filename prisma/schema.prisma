@@ -148,5 +148,4 @@ model StockMovement {
   @@index([userId, createdAt])
   @@index([productId, createdAt])
   @@index([invoiceId])
-  @@unique([productId, reason])
 }
