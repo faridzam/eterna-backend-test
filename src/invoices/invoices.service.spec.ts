@@ -16,6 +16,7 @@ import {
   InvoiceRecord,
   InvoiceRepository,
 } from './domain/invoice.types.js';
+import { ListInvoicesQueryDto } from './dto/invoice.dto.js';
 import { InvoicesService } from './invoices.service.js';
 
 function createHarness() {
@@ -245,6 +246,14 @@ describe('InvoicesService', () => {
     const created = await harness.service.create('user-1', invoiceInput);
     await expect(
       harness.service.get('user-2', created.id),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('returns not found when the invoice list is empty', async () => {
+    const harness = createHarness();
+
+    await expect(
+      harness.service.list('user-1', new ListInvoicesQueryDto()),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 

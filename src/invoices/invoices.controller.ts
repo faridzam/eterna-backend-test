@@ -1,34 +1,34 @@
 import {
-    BadRequestException,
-    Body,
-    Controller,
-    Get,
-    Headers,
-    Param,
-    Patch,
-    Post,
-    Query,
-    Req,
-    UseGuards,
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
 import {
-    ApiBadRequestResponse,
-    ApiConflictResponse,
-    ApiCreatedResponse,
-    ApiNotFoundResponse,
-    ApiOkResponse,
-    ApiOperation,
-    ApiTags,
-    ApiUnauthorizedResponse,
+  ApiBadRequestResponse,
+  ApiConflictResponse,
+  ApiCreatedResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CsrfOriginGuard } from '../auth/csrf-origin.guard.js';
 import type { AuthenticatedRequest } from '../auth/session-auth.guard.js';
 import { SessionAuthGuard } from '../auth/session-auth.guard.js';
 import {
-    CreateInvoiceDto,
-    InvoiceStatusDto,
-    ListInvoicesQueryDto,
-    UpdateInvoiceDto,
+  CreateInvoiceDto,
+  InvoiceStatusDto,
+  ListInvoicesQueryDto,
+  UpdateInvoiceDto,
 } from './dto/invoice.dto.js';
 import { InvoicesService } from './invoices.service.js';
 
@@ -90,6 +90,7 @@ export class InvoicesController {
   @Get()
   @ApiOperation({ summary: 'List owned invoices' })
   @ApiOkResponse({ description: 'Invoices retrieved successfully.' })
+  @ApiNotFoundResponse({ description: 'No invoices match the filter.' })
   @ApiUnauthorizedResponse({ description: 'Authentication is required.' })
   async list(
     @Req() request: AuthenticatedRequest,
